@@ -1,0 +1,13 @@
+<!-- Launcher icon foreground: signal/bridge symbol centred in 108×108dp safe zone -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Scaled version of the notification icon, centred in safe zone (28dp inset on each side) -->
+    <group android:translateX="30" android:translateY="30">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M4,20.25L4,22.5C15.41,22.5 22.91,29.25 25.09,38.54L29.52,37.62C26.75,25.43 15.68,20.25 4,20.25ZM4,11.25L4,13.5C24.12,13.5 35.44,23.92 39.38,38.25L43.88,37.25C39.29,21.17 26.09,11.25 4,11.25ZM13,33.75C10.79,33.75 9,35.54 9,37.75C9,39.96 10.79,41.75 13,41.75C15.21,41.75 17,39.96 17,37.75C17,35.54 15.21,33.75 13,33.75Z" />
+    </group>
+</vector>

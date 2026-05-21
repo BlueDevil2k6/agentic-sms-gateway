@@ -60,6 +60,7 @@ fun OnboardingScreen(
 
 // ── Step: QR Scanner ─────────────────────────────────────────────────────────
 
+@androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 @Composable
 private fun QrScannerStep(viewModel: OnboardingViewModel) {
     val context = LocalContext.current
@@ -119,7 +120,9 @@ private fun QrScannerStep(viewModel: OnboardingViewModel) {
                                                 mediaImage, proxy.imageInfo.rotationDegrees
                                             )
                                             scanner.process(image)
-                                                .addOnSuccessListener { barcodes ->
+                                                .addOnSuccessListener(
+                                                    ContextCompat.getMainExecutor(ctx)
+                                                ) { barcodes ->
                                                     barcodes.firstOrNull {
                                                         it.format == Barcode.FORMAT_QR_CODE
                                                     }?.rawValue?.let { raw ->

@@ -9,7 +9,11 @@ import android.content.pm.ServiceInfo
 import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import com.agentic.smsbridge.MainActivity
 import com.agentic.smsbridge.R
 import com.agentic.smsbridge.data.BridgeRepository
@@ -88,19 +92,21 @@ class BridgeService : LifecycleService() {
         }
 
         // Update notification when connection state changes
-        androidx.lifecycle.lifecycleScope.launchWhenStarted {
-            repository.connectionState.collect { state ->
-                val statusText = when (state) {
-                    ConnectionState.CONNECTED    -> "Connected · ${config.serverUrl.removePrefix("wss://").removePrefix("ws://")}"
-                    ConnectionState.CONNECTING   -> "Connecting…"
-                    ConnectionState.RECONNECTING -> {
-                        val attempt = repository.reconnectAttempt.value
-                        "Reconnecting… (attempt $attempt)"
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                repository.connectionState.collect { state ->
+                    val statusText = when (state) {
+                        ConnectionState.CONNECTED    -> "Connected · ${config.serverUrl.removePrefix("wss://").removePrefix("ws://")}"
+                        ConnectionState.CONNECTING   -> "Connecting…"
+                        ConnectionState.RECONNECTING -> {
+                            val attempt = repository.reconnectAttempt.value
+                            "Reconnecting… (attempt $attempt)"
+                        }
+                        ConnectionState.FAILED  -> "Connection failed — check API key"
+                        ConnectionState.IDLE    -> "Idle"
                     }
-                    ConnectionState.FAILED  -> "Connection failed — check API key"
-                    ConnectionState.IDLE    -> "Idle"
+                    updateNotification(statusText)
                 }
-                updateNotification(statusText)
             }
         }
 
