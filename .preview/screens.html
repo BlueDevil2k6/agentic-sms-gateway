@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMS Bridge — Android UI Screens</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Google Sans', 'Roboto', sans-serif;
+    background: #F0F4F8;
+    padding: 32px 24px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1A237E;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #546E7A;
+    margin-bottom: 32px;
+  }
+
+  /* ── Tab nav ── */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+  .tab {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 2px solid #C5CAE9;
+    background: white;
+    font-size: 13px;
+    font-weight: 500;
+    color: #5C6BC0;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .tab:hover { border-color: #5C6BC0; }
+  .tab.active {
+    background: #3F51B5;
+    border-color: #3F51B5;
+    color: white;
+  }
+
+  /* ── Phone frame ── */
+  .phone-wrap {
+    display: none;
+    justify-content: center;
+  }
+  .phone-wrap.active { display: flex; }
+
+  .phone {
+    width: 393px;
+    background: #1C1B1F;
+    border-radius: 48px;
+    padding: 14px;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.35), 0 8px 24px rgba(0,0,0,0.2);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    display: block;
+    width: 120px;
+    height: 32px;
+    background: #1C1B1F;
+    border-radius: 0 0 24px 24px;
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+  }
+  /* camera pill */
+  .phone::after {
+    content: '';
+    display: block;
+    width: 12px;
+    height: 12px;
+    background: #2a2a2e;
+    border-radius: 50%;
+    position: absolute;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 11;
+    box-shadow: inset 0 0 0 2px #3a3a3e;
+  }
+
+  .screen {
+    background: #FAFAFA;
+    border-radius: 36px;
+    overflow: hidden;
+    min-height: 780px;
+    position: relative;
+  }
+
+  /* ── Status bar ── */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px 6px;
+    background: inherit;
+  }
+  .status-bar .time { font-size: 14px; font-weight: 600; color: #1C1B1F; }
+  .status-bar .icons { display: flex; gap: 6px; align-items: center; font-size: 12px; color: #1C1B1F; }
+
+  /* ── Top app bar ── */
+  .app-bar {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px 12px;
+    gap: 12px;
+  }
+  .app-bar .back-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: 20px;
+    color: #1C1B1F;
+    cursor: pointer;
+  }
+  .app-bar .title {
+    font-size: 22px;
+    font-weight: 400;
+    color: #1C1B1F;
+    flex: 1;
+  }
+  .app-bar .action-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: 20px;
+    color: #49454F;
+  }
+
+  /* ── Shared layout ── */
+  .screen-content { padding: 0 16px 24px; }
+
+  /* ── Typography ── */
+  .headline-large { font-size: 28px; font-weight: 400; color: #1C1B1F; line-height: 1.3; margin-bottom: 8px; }
+  .headline-medium { font-size: 22px; font-weight: 400; color: #1C1B1F; margin-bottom: 8px; }
+  .body-large { font-size: 16px; color: #49454F; line-height: 1.5; }
+  .body-medium { font-size: 14px; color: #49454F; line-height: 1.5; }
+  .body-small { font-size: 12px; color: #79747E; }
+  .label-large { font-size: 14px; font-weight: 500; letter-spacing: 0.1px; }
+
+  /* ── Cards ── */
+  .card {
+    background: white;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #3F51B5;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ── Buttons ── */
+  .btn-filled {
+    display: block;
+    width: 100%;
+    padding: 14px 24px;
+    background: #3F51B5;
+    color: white;
+    border: none;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.1px;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .btn-filled:disabled { background: #CAC4D0; }
+  .btn-outlined {
+    display: block;
+    width: 100%;
+    padding: 13px 24px;
+    background: transparent;
+    color: #3F51B5;
+    border: 1.5px solid #79747E;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .btn-text {
+    display: block;
+    width: 100%;
+    padding: 12px 24px;
+    background: transparent;
+    color: #3F51B5;
+    border: none;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+  }
+  .btn-danger {
+    display: block;
+    width: 100%;
+    padding: 14px 24px;
+    background: #B00020;
+    color: white;
+    border: none;
+    border-radius: 100px;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  /* ── Status dots ── */
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+  .status-row + .status-row { border-top: 1px solid #F5F5F5; }
+  .status-left { display: flex; align-items: center; gap: 10px; }
+  .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.green  { background: #4CAF50; box-shadow: 0 0 0 3px rgba(76,175,80,0.15); }
+  .dot.amber  { background: #FFC107; box-shadow: 0 0 0 3px rgba(255,193,7,0.15); }
+  .dot.red    { background: #F44336; box-shadow: 0 0 0 3px rgba(244,67,54,0.15); }
+  .dot.grey   { background: #9E9E9E; }
+  .status-label { font-size: 14px; color: #1C1B1F; }
+  .status-value { font-size: 12px; color: #79747E; }
+  .status-value.green { color: #4CAF50; }
+  .status-value.amber { color: #F57C00; }
+  .status-value.red   { color: #F44336; }
+
+  /* ── Connection banner ── */
+  .conn-banner {
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .conn-banner.connected { background: #E8F5E9; }
+  .conn-banner.reconnecting { background: #FFF8E1; }
+  .conn-banner.disconnected { background: #FFEBEE; }
+  .conn-banner.idle { background: #F5F5F5; }
+  .conn-main { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .conn-title { font-size: 16px; font-weight: 500; }
+  .conn-title.connected { color: #2E7D32; }
+  .conn-title.reconnecting { color: #E65100; }
+  .conn-title.disconnected { color: #C62828; }
+  .conn-url { font-size: 12px; color: #79747E; }
+
+  /* ── QR viewfinder ── */
+  .qr-area {
+    background: #1C1B1F;
+    border-radius: 16px;
+    margin: 16px 0;
+    height: 280px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+  }
+  .qr-area-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .qr-corners {
+    width: 180px;
+    height: 180px;
+    position: relative;
+  }
+  .qr-corners::before, .qr-corners::after,
+  .qr-corner-br, .qr-corner-bl {
+    content: '';
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-color: white;
+    border-style: solid;
+    border-width: 0;
+  }
+  .qr-corners::before { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-radius: 4px 0 0 0; }
+  .qr-corners::after  { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-radius: 0 4px 0 0; }
+  .qr-corner-br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-radius: 0 0 4px 0; }
+  .qr-corner-bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-radius: 0 0 0 4px; }
+  .scan-line {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    top: 50%;
+    width: 160px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #3F51B5, transparent);
+    animation: scan 2s ease-in-out infinite;
+  }
+  @keyframes scan {
+    0%   { top: calc(50% - 70px); opacity: 1; }
+    50%  { top: calc(50% + 70px); opacity: 1; }
+    100% { top: calc(50% - 70px); opacity: 1; }
+  }
+  .qr-hint { font-size: 12px; color: rgba(255,255,255,0.6); text-align: center; }
+  .qr-sample {
+    width: 100px; height: 100px;
+    background: white;
+    border-radius: 4px;
+    opacity: 0.15;
+    background-image:
+      repeating-linear-gradient(0deg, #000 0, #000 8px, transparent 8px, transparent 16px),
+      repeating-linear-gradient(90deg, #000 0, #000 8px, transparent 8px, transparent 16px);
+    background-size: 16px 16px;
+  }
+
+  /* ── Permission rows ── */
+  .perm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #F5F5F5;
+  }
+  .perm-label { font-size: 16px; color: #1C1B1F; }
+  .perm-granted { font-size: 13px; color: #4CAF50; font-weight: 500; }
+  .perm-btn {
+    padding: 6px 16px;
+    border: 1.5px solid #3F51B5;
+    border-radius: 100px;
+    background: transparent;
+    color: #3F51B5;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  /* ── Activity table ── */
+  .activity-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #F5F5F5;
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-label { font-size: 14px; color: #49454F; }
+  .activity-value { font-size: 14px; color: #79747E; font-variant-numeric: tabular-nums; }
+
+  /* ── Text field ── */
+  .text-field {
+    position: relative;
+    margin-bottom: 12px;
+  }
+  .text-field label {
+    display: block;
+    font-size: 12px;
+    color: #3F51B5;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  .text-field input {
+    width: 100%;
+    padding: 14px 16px;
+    border: 1.5px solid #3F51B5;
+    border-radius: 4px;
+    font-size: 14px;
+    color: #1C1B1F;
+    outline: none;
+    background: transparent;
+  }
+
+  /* ── Settings rows ── */
+  .setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #F5F5F5;
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-key { font-size: 14px; color: #49454F; }
+  .setting-val { font-size: 13px; color: #79747E; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Connecting spinner ── */
+  .spinner-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 400px;
+    gap: 24px;
+  }
+  .spinner {
+    width: 48px; height: 48px;
+    border: 4px solid #E8EAF6;
+    border-top-color: #3F51B5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Nav bar ── */
+  .nav-bar {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 8px;
+  }
+  .nav-pill {
+    width: 120px;
+    height: 5px;
+    background: #1C1B1F;
+    border-radius: 100px;
+    opacity: 0.3;
+  }
+
+  /* ── Screen label ── */
+  .screen-label {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #78909C;
+    font-weight: 500;
+  }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: #F0F0F0; margin: 4px 0 8px; }
+
+  /* ── Empty space ── */
+  .spacer-sm { height: 8px; }
+  .spacer-md { height: 16px; }
+  .spacer-lg { height: 24px; }
+  .spacer-xl { height: 48px; }
+
+  /* ── Onboarding center layout ── */
+  .center-layout {
+    padding: 24px 24px;
+    display: flex;
+    flex-direction: column;
+    min-height: 680px;
+  }
+
+  /* Battery icon */
+  .battery-icon {
+    font-size: 64px;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  /* Fix/warning link */
+  .fix-link { font-size: 12px; color: #3F51B5; font-weight: 500; }
+
+</style>
+</head>
+<body>
+
+<h1>SMS Bridge — Android UI</h1>
+<p class="subtitle">6 screens · Material Design 3 · Jetpack Compose</p>
+
+<div class="tabs">
+  <div class="tab active"   onclick="show(0)">① QR Scanner</div>
+  <div class="tab"          onclick="show(1)">② Connecting</div>
+  <div class="tab"          onclick="show(2)">③ Permissions</div>
+  <div class="tab"          onclick="show(3)">④ Battery</div>
+  <div class="tab"          onclick="show(4)">⑤ Dashboard</div>
+  <div class="tab"          onclick="show(5)">⑥ Settings</div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- SCREEN 0: QR Scanner                                                   -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="phone-wrap active" id="s0">
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div style="background:#FAFAFA">
+          <div class="status-bar">
+            <span class="time">9:41</span>
+            <span class="icons">▲ ▼ 📶 🔋</span>
+          </div>
+        </div>
+
+        <div class="center-layout">
+          <div class="spacer-lg"></div>
+          <div style="text-align:center; margin-bottom:6px;">
+            <div style="width:56px;height:56px;background:#E8EAF6;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:12px;">📡</div>
+          </div>
+          <h1 class="headline-large" style="text-align:center;font-size:24px;">Agentic SMS Bridge</h1>
+          <p class="body-medium" style="text-align:center;margin-bottom:20px;color:#79747E;">
+            Scan the QR code from your<br>gateway server to connect.
+          </p>
+
+          <!-- Camera viewfinder -->
+          <div class="qr-area">
+            <!-- simulated camera bg -->
+            <div style="position:absolute;inset:0;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);opacity:0.9;border-radius:16px;"></div>
+            <div class="qr-area-overlay">
+              <div class="qr-corners">
+                <div class="qr-corner-br"></div>
+                <div class="qr-corner-bl"></div>
+                <div class="qr-sample"></div>
+              </div>
+              <div class="scan-line"></div>
+            </div>
+            <div style="position:absolute;bottom:16px;left:0;right:0;text-align:center;">
+              <span class="qr-hint">Point camera at QR code</span>
+            </div>
+          </div>
+
+          <button class="btn-text" style="margin-top:0;">Enter manually ›</button>
+        </div>
+
+        <div class="nav-bar"><div class="nav-pill"></div></div>
+      </div>
+    </div>
+    <div class="screen-label">Onboarding — Step 1 of 4</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- SCREEN 1: Connecting                                                   -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="phone-wrap" id="s1">
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div style="background:#FAFAFA">
+          <div class="status-bar">
+            <span class="time">9:41</span>
+            <span class="icons">▲ ▼ 📶 🔋</span>
+          </div>
+        </div>
+
+        <div class="spinner-wrap">
+          <div class="spinner"></div>
+          <div style="text-align:center;">
+            <p class="body-large" style="font-weight:500;margin-bottom:8px;">Connecting to server…</p>
+            <p class="body-small">your-server.com:8765</p>
+          </div>
+        </div>
+
+        <div class="nav-bar"><div class="nav-pill"></div></div>
+      </div>
+    </div>
+    <div class="screen-label">Onboarding — Step 2 of 4</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- SCREEN 2: Permissions                                                  -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="phone-wrap" id="s2">
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div style="background:#FAFAFA">
+          <div class="status-bar">
+            <span class="time">9:41</span>
+            <span class="icons">▲ ▼ 📶 🔋</span>
+          </div>
+        </div>
+
+        <div class="center-layout">
+          <h2 class="headline-medium">Grant permissions</h2>
+          <p class="body-medium" style="margin-bottom:24px;">These are required for the bridge to work reliably.</p>
+
+          <div class="card" style="margin-bottom:16px;">
+            <div class="perm-row">
+              <span class="perm-label">✓&nbsp; Receive SMS</span>
+              <span class="perm-granted">Granted</span>
+            </div>
+            <div class="perm-row">
+              <span class="perm-label">✓&nbsp; Send SMS</span>
+              <span class="perm-granted">Granted</span>
+            </div>
+            <div class="perm-row" style="border-bottom:none;">
+              <span class="perm-label">○&nbsp; Start on boot</span>
+              <button class="perm-btn">Grant</button>
+            </div>
+          </div>
+
+          <p class="body-small" style="margin-bottom:24px;color:#79747E;">
+            Start on boot ensures the bridge restarts automatically after the device reboots.
+          </p>
+
+          <div style="flex:1;"></div>
+          <div style="margin-top:auto;padding-top:24px;">
+            <button class="btn-filled">Continue</button>
+          </div>
+        </div>
+
+        <div class="nav-bar"><div class="nav-pill"></div></div>
+      </div>
+    </div>
+    <div class="screen-label">Onboarding — Step 3 of 4</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- SCREEN 3: Battery Optimisation                                         -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="phone-wrap" id="s3">
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div style="background:#FAFAFA">
+          <div class="status-bar">
+            <span class="time">9:41</span>
+            <span class="icons">▲ ▼ 📶 🔋</span>
+          </div>
+        </div>
+
+        <div class="center-layout">
+          <div class="battery-icon">🔋</div>
+          <h2 class="headline-medium">Allow background activity</h2>
+          <p class="body-medium" style="margin-bottom:16px;">
+            Android may put this app to sleep to save battery. Disabling this ensures the bridge stays connected and delivers messages without delay.
+          </p>
+
+          <div class="card" style="background:#FFF8E1;border:1px solid #FFE082;">
+            <p class="body-small" style="color:#E65100;">
+              ⚠️  Without this, Android may delay message delivery by up to 15 minutes during Doze mode. The FCM fallback will still wake the app, but with higher latency.
+            </p>
+          </div>
+
+          <div style="flex:1;"></div>
+          <div style="margin-top:auto;padding-top:20px;">
+            <button class="btn-filled">Disable battery optimisation</button>
+            <button class="btn-text">Skip — I understand delivery may be delayed</button>
+          </div>
+        </div>
+
+        <div class="nav-bar"><div class="nav-pill"></div></div>
+      </div>
+    </div>
+    <div class="screen-label">Onboarding — Step 4 of 4</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- SCREEN 4: Status Dashboard                                             -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="phone-wrap" id="s4">
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div style="background:#FAFAFA">
+          <div class="status-bar">
+            <span class="time">9:41</span>
+            <span class="icons">▲ ▼ 📶 🔋</span>
+          </div>
+          <div class="app-bar">
+            <span class="title">SMS Bridge</span>
+            <span class="action-btn">⚙</span>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <!-- Connection banner -->
+          <div class="conn-banner connected">
+            <div class="conn-main">
+              <div class="dot green"></div>
+              <span class="conn-title connected">Connected</span>
+            </div>
+            <div class="conn-url">your-server.com:8765</div>
+          </div>
+
+          <!-- Status indicators -->
+          <div class="card">
+            <div class="status-row">
+              <div class="status-left">
+                <div class="dot green"></div>
+                <span class="status-label">SMS permissions</span>
+              </div>
+              <span class="status-value green">Granted</span>
+            </div>
+            <div class="status-row">
+              <div class="status-left">
+                <div class="dot green"></div>
+                <span class="status-label">FCM wake-up</span>
+              </div>
+              <span class="status-value green">Ready</span>
+            </div>
+            <div class="status-row">
+              <div class="status-left">
+                <div class="dot amber"></div>
+                <span class="status-label">Battery exempt</span>
+              </div>
+              <span class="status-value amber">Restricted &nbsp;<span class="fix-link">Fix →</span></span>
+            </div>
+          </div>
+
+          <!-- Activity counters -->
+          <div class="card">
+            <div class="card-title">Activity</div>
+            <div class="activity-row">
+              <span class="activity-label">Inbound forwarded</span>
+              <span class="activity-value">142</span>
+            </div>
+            <div class="activity-row">
+              <span class="activity-label">Outbound sent</span>
+              <span class="activity-value">87</span>
+            </div>
+            <div class="activity-row">
+              <span class="activity-label">Last activity</span>
+              <span class="activity-value">2 min ago</span>
+            </div>
+          </div>
+
+          <!-- Device name -->
+          <div class="card">
+            <div class="setting-row" style="border:none;padding:0;">
+              <span class="setting-key">Device name</span>
+              <span class="setting-val">My Gateway Phone</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="nav-bar"><div class="nav-pill"></div></div>
+      </div>
+    </div>
+    <div class="screen-label">Status Dashboard (main screen)</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<!-- SCREEN 5: Settings                                                     -->
+<!-- ══════════════════════════════════════════════════════════════════════ -->
+<div class="phone-wrap" id="s5">
+  <div>
+    <div class="phone">
+      <div class="screen">
+        <div style="background:#FAFAFA">
+          <div class="status-bar">
+            <span class="time">9:41</span>
+            <span class="icons">▲ ▼ 📶 🔋</span>
+          </div>
+          <div class="app-bar">
+            <span class="back-btn">←</span>
+            <span class="title">Settings</span>
+          </div>
+        </div>
+
+        <div class="screen-content">
+          <!-- Connection -->
+          <div class="card">
+            <div class="card-title">Connection</div>
+            <div class="setting-row">
+              <span class="setting-key">Server</span>
+              <span class="setting-val">wss://your-server.com:8765</span>
+            </div>
+            <div class="setting-row" style="border-bottom:none;">
+              <span class="setting-key">API Key</span>
+              <span class="setting-val">sk-bridge-abcd••••••••</span>
+            </div>
+          </div>
+
+          <!-- Device -->
+          <div class="card">
+            <div class="card-title">Device</div>
+            <div class="text-field">
+              <label>Device name</label>
+              <input type="text" value="My Gateway Phone">
+            </div>
+          </div>
+
+          <!-- System -->
+          <div class="card">
+            <div class="card-title">System</div>
+            <button class="btn-outlined" style="margin:0;">Battery optimisation settings</button>
+          </div>
+
+          <!-- About -->
+          <div class="card">
+            <div class="card-title">About</div>
+            <div class="setting-row" style="border:none;padding:0;">
+              <span class="setting-key">Version</span>
+              <span class="setting-val">0.1.0</span>
+            </div>
+          </div>
+
+          <div class="spacer-md"></div>
+
+          <!-- Danger zone -->
+          <button class="btn-danger">Disconnect and reset</button>
+        </div>
+
+        <div class="nav-bar"><div class="nav-pill"></div></div>
+      </div>
+    </div>
+    <div class="screen-label">Settings</div>
+  </div>
+</div>
+
+<script>
+function show(idx) {
+  document.querySelectorAll('.phone-wrap').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+  document.querySelectorAll('.tab').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+}
+</script>
+</body>
+</html>
