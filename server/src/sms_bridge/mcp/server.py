@@ -14,11 +14,12 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 
 from sms_bridge.router.message_router import MessageRouter
+from sms_bridge.mcp.qr import make_qr_route
 
 log = logging.getLogger(__name__)
 
 
-def build_mcp_app(router: MessageRouter, api_key: str) -> Starlette:
+def build_mcp_app(router: MessageRouter, api_key: str, ws_url: str = "") -> Starlette:
     """Build and return the MCP Starlette ASGI app."""
 
     mcp = Server("agentic-sms-gateway")
@@ -127,9 +128,10 @@ def build_mcp_app(router: MessageRouter, api_key: str) -> Starlette:
         return JSONResponse({"status": "ok", "devices_connected": len(router._devices)})
 
     return Starlette(routes=[
-        Route("/mcp",          handle_sse,      methods=["GET"]),
-        Route("/mcp/messages", handle_messages, methods=["POST"]),
-        Route("/health",       handle_health,   methods=["GET"]),
+        Route("/mcp",          handle_sse,                       methods=["GET"]),
+        Route("/mcp/messages", handle_messages,                  methods=["POST"]),
+        Route("/health",       handle_health,                    methods=["GET"]),
+        Route("/setup/qr",     make_qr_route(ws_url, api_key),   methods=["GET"]),
     ])
 
 

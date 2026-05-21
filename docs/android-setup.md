@@ -5,139 +5,127 @@
 - Android 14 (API 34) or higher
 - Google Play Services (required for FCM wake-up)
 - A gateway server already running (see server setup)
+- A SIM card in the device
+
+> **Note:** This app does **not** need to be set as the default SMS app. It runs as a background bridge alongside your existing messaging app.
+
+---
+
+## Get the Setup QR Code
+
+On your gateway server, open a browser and navigate to:
+
+```
+https://your-server.com/setup/qr
+```
+
+You will be prompted for your API key. The page returns a QR code PNG — keep this on screen or print it.
+
+> Treat the QR code like a password. It contains your API key. Do not screenshot or share it.
 
 ---
 
 ## Installation
 
-1. Download and install the APK on your Android device
-2. Open the app — a setup wizard will guide you through the remaining steps
+1. Install the APK on your Android device
+2. Open the app — you will see the QR scanner immediately
 
 ---
 
-## Setup Wizard
+## Setup (takes about 60 seconds)
 
-### Step 1 — Set as Default SMS App
+### Step 1 — Scan QR Code
 
-The app must be the default SMS app to intercept incoming messages.
+Point the camera at the QR code from your server. The app detects it automatically — no button to tap.
 
-- Tap **Set as Default** — this opens Android's Default Apps settings
-- Select **Agentic SMS Gateway** as the SMS app
-- Return to the setup wizard
-
-> The app will not receive incoming SMS until this step is completed.
+If the camera is unavailable, tap **Enter manually** to type the server URL and API key directly.
 
 ### Step 2 — Grant Permissions
 
-The app requires the following permissions:
+The app requests three permissions:
 
 | Permission | Why |
 |---|---|
-| `RECEIVE_SMS` | Receive incoming SMS messages |
-| `SEND_SMS` | Send outbound SMS on behalf of the agent |
-| `READ_CONTACTS` | Resolve phone numbers to contact names |
-| `READ_PHONE_STATE` | Detect SIM slot availability |
-| `RECEIVE_BOOT_COMPLETED` | Restart the bridge service after reboot |
+| Receive SMS | Forward incoming messages to the server |
+| Send SMS | Deliver outbound messages from the server |
+| Start on boot | Restart the bridge automatically after reboot |
 
-Tap **Grant Permissions** and accept each prompt.
+All three are required. If a permission is denied, the app explains how to grant it from Android Settings.
 
-### Step 3 — Battery Optimization
+### Step 3 — Battery Optimisation
 
-This is the most important step for reliable operation.
+Tap **Disable battery optimisation** and select **Unrestricted** in the system dialog.
 
-Android's Doze mode can restrict network access for background apps. Exempting the app ensures the WebSocket connection stays alive and FCM wake-ups are delivered promptly.
+This prevents Android from suspending the app's network connection during Doze mode. You can skip this step — the FCM fallback will still wake the app when needed, but with slightly higher latency (a few extra seconds).
 
-Tap **Exempt from Battery Optimization** — this opens the system battery settings for the app. Select **Unrestricted**.
+### Done
 
-> You can skip this step, but the bridge may experience delays of up to 15 minutes when waking from Doze. FCM will still deliver wake-ups, but with higher latency.
-
-### Step 4 — Connect to Gateway Server
-
-Enter your server details:
-
-| Field | Example |
-|---|---|
-| Server URL | `wss://your-server.com:8765` |
-| API Key | `sk-bridge-xxxxxxxxxxxxxxxx` |
-
-Tap **Test Connection** — the app will attempt to connect and show a result:
-- **Connected** — setup is complete
-- **Connection refused** — check the server URL and that the server is running
-- **Unauthorized** — check the API key
-
-### Step 5 — Done
-
-The app shows a status dashboard. All indicators should be green:
-
-```
-● Connected          wss://your-server.com
-● Default SMS app    Yes
-● Battery exempt     Yes
-● FCM               Ready
-● Last seen          Just now
-```
+The app shows the Status Dashboard with green indicators. The bridge is active.
 
 ---
 
 ## Status Dashboard
 
-The main screen shows live bridge status at a glance:
+```
+●  Connected          wss://your-server.com
+●  SMS permissions    Granted
+●  FCM                Ready
+⚠  Battery exempt     Not set  [Fix →]
 
-| Indicator | Meaning |
+Inbound forwarded     142
+Outbound sent          87
+Last activity       2 min ago
+```
+
+| Indicator | What it means |
 |---|---|
-| Connected / Disconnected | WebSocket connection to gateway server |
-| Default SMS app | Whether the app is set as the system default |
-| Battery exempt | Whether battery optimization is disabled |
-| FCM Ready | Whether FCM wake-up is registered |
-| Last activity | Timestamp of last message sent or received |
-| Messages relayed | Total count since install |
+| Connected (green) | WebSocket open, bridge is live |
+| Reconnecting (amber) | Temporary disconnect, retrying |
+| Disconnected (red) | Cannot reach server |
+| SMS permissions (red) | Receive or Send SMS permission was revoked |
+| FCM (green) | Wake-up push notifications are working |
+| Battery exempt (amber) | App may be delayed by Doze — tap Fix to resolve |
 
 ---
 
-## Notifications
+## Settings
 
-The app shows a persistent foreground notification while the bridge is active:
+Tap the gear icon on the Status Dashboard.
 
-```
-SMS Bridge — Connected
-Tap to open  ·  wss://your-server.com
-```
-
-This notification is required by Android to keep the background service alive. It cannot be dismissed while the bridge is running. You can minimise its appearance in Android notification settings (silent, no sound, collapsed).
-
----
-
-## Multi-SIM Devices
-
-If your device has two SIM cards, the gateway server can specify which SIM to use per message via the `sim_slot` field (0 or 1). The app defaults to SIM slot 0 if not specified.
-
-The SIM slots available on the device are reported to the server in the `device.hello` message on connection.
+- **Re-scan QR code** — update server connection (e.g. after API key rotation)
+- **Device name** — the label shown in the server's device registry
+- **Battery optimisation** — shortcut to the system setting
+- **Disconnect and reset** — wipes stored credentials, stops the bridge, returns to QR scanner
 
 ---
 
 ## Troubleshooting
 
-**Bridge disconnects frequently**
-- Check that battery optimization is set to Unrestricted for the app
-- Some manufacturer overlays (Samsung, Xiaomi, OPPO) have additional battery management beyond Android's standard Doze — check your device's own battery or app management settings for an additional "allow background activity" toggle
+**Bridge disconnects repeatedly**
+- Go to Settings → Battery → App battery usage → find this app → set to Unrestricted
+- Some manufacturers (Samsung, Xiaomi, OPPO) have additional background app controls beyond standard Android — check your device's own battery or app management settings
 
 **Incoming SMS not forwarded**
-- Confirm the app is set as the default SMS app (Step 1)
-- Check the status dashboard — if WebSocket shows Disconnected, the app cannot forward messages
+- Confirm the `Receive SMS` permission is granted (Settings → Permissions)
+- Some default SMS apps abort the `SMS_RECEIVED` broadcast before it reaches this app — this is rare with Google Messages or Samsung Messages but possible with third-party SMS apps
 
-**Outbound SMS delayed**
-- If the WebSocket is not connected, the gateway uses FCM to wake the app. FCM delivery is typically 1–3 seconds but can take longer on some networks
-- If FCM shows "Not Ready" in the status dashboard, ensure Google Play Services is up to date
+**Outbound SMS not delivered**
+- Check the gateway server's `outbound/failed/` directory for error details
+- Confirm the `Send SMS` permission is granted
 
-**App not starting after reboot**
-- Grant the `RECEIVE_BOOT_COMPLETED` permission if prompted
-- Some devices require the app to be opened at least once after reboot before auto-start is permitted — open the app manually once after the first reboot
+**App not restarting after reboot**
+- Confirm the `Start on boot` permission is granted
+- On some devices, you must open the app manually once after the first reboot before auto-start is permitted
+
+**QR code not detected**
+- Ensure the QR code fills most of the viewfinder
+- Try better lighting
+- Use the **Enter manually** fallback if needed
 
 ---
 
-## Security Notes
+## Known Limitations
 
-- The API key is stored in Android's `EncryptedSharedPreferences` — it is not accessible to other apps
-- All WebSocket traffic is encrypted via TLS (`wss://`)
-- FCM push payloads contain only a wake signal — no message content is sent through Google's infrastructure
-- The app does not upload SMS content to any third-party service
+- **SMS_RECEIVED ordering:** The bridge listens on the `SMS_RECEIVED` broadcast, which is delivered to all apps with the permission. If another SMS app on the device aborts this broadcast first, the bridge will not see the message. This is uncommon with modern SMS apps. Using the device as a dedicated gateway (with no competing SMS apps) eliminates this entirely.
+- **MMS:** Not supported in this version. Only SMS is bridged.
+- **Self-signed TLS certificates:** The app uses Android's default CA trust store. Self-signed server certificates are not supported in this version.
