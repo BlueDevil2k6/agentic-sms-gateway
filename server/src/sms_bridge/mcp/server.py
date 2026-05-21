@@ -5,12 +5,14 @@ Exposes SMS capabilities as MCP tools over SSE transport.
 Agents connect to wss://your-server/mcp and discover tools automatically.
 """
 
+import json
 import logging
 
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from mcp import types
 from starlette.applications import Starlette
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 
 from sms_bridge.router.message_router import MessageRouter
@@ -88,19 +90,16 @@ def build_mcp_app(router: MessageRouter, api_key: str, ws_url: str = "") -> Star
                 from_number=arguments["from_number"],
                 limit=min(arguments.get("limit", 20), 100),
             )
-            import json
             return [types.TextContent(type="text", text=json.dumps(messages, indent=2))]
 
         elif name == "list_conversations":
             convos = router.queue.list_conversations(
                 limit=arguments.get("limit", 20),
             )
-            import json
             return [types.TextContent(type="text", text=json.dumps(convos, indent=2))]
 
         elif name == "list_devices":
             devices = router.list_devices()
-            import json
             return [types.TextContent(type="text", text=json.dumps(devices, indent=2))]
 
         else:
@@ -111,12 +110,9 @@ def build_mcp_app(router: MessageRouter, api_key: str, ws_url: str = "") -> Star
     sse = SseServerTransport("/mcp/messages")
 
     async def handle_sse(request):
-        # Validate API key
         auth = request.headers.get("Authorization", "")
         if auth != f"Bearer {api_key}":
-            from starlette.responses import Response
             return Response("Unauthorized", status_code=401)
-
         async with sse.connect_sse(request.scope, request.receive, request._send) as streams:
             await mcp.run(streams[0], streams[1], mcp.create_initialization_options())
 
@@ -124,7 +120,6 @@ def build_mcp_app(router: MessageRouter, api_key: str, ws_url: str = "") -> Star
         await sse.handle_post_message(request.scope, request.receive, request._send)
 
     async def handle_health(request):
-        from starlette.responses import JSONResponse
         return JSONResponse({"status": "ok", "devices_connected": len(router._devices)})
 
     return Starlette(routes=[
@@ -136,15 +131,16 @@ def build_mcp_app(router: MessageRouter, api_key: str, ws_url: str = "") -> Star
 
 
 class MCPServer:
-    def __init__(self, router: MessageRouter, port: int, api_key: str):
+    def __init__(self, router: MessageRouter, port: int, api_key: str, ws_url: str = ""):
         self.router = router
         self.port = port
         self.api_key = api_key
+        self.ws_url = ws_url
 
     async def serve(self):
         import uvicorn
-        app = build_mcp_app(self.router, self.api_key)
+        app = build_mcp_app(self.router, self.api_key, self.ws_url)
         log.info(f"MCP server listening on http://0.0.0.0:{self.port}/mcp")
-        config = uvicorn.Config(app, host="0.0.0.0", port=self.port, log_level="info")
-        server = uvicorn.Server(config)
+        cfg = uvicorn.Config(app, host="0.0.0.0", port=self.port, log_level="info")
+        server = uvicorn.Server(cfg)
         await server.serve()

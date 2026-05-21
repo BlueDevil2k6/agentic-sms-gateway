@@ -18,6 +18,8 @@ Directory layout:
       └── failed/       Agent never consumed — never auto-deleted
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging

@@ -3,7 +3,11 @@ Message Router — coordinates between the WebSocket server, MCP server,
 FCM client, and file queue.
 """
 
+from __future__ import annotations
+
+import json
 import logging
+from pathlib import Path
 from typing import Callable
 
 from sms_bridge.queue.file_queue import FileQueue
@@ -25,14 +29,20 @@ class MessageRouter:
     def __init__(self, queue: FileQueue, fcm: FcmClient):
         self.queue = queue
         self.fcm = fcm
-        self._devices: dict[str, DeviceConnection] = {}       # device_id → connection
+        self._devices: dict[str, DeviceConnection] = {}       # device_id → live connection
         self._mcp_notifiers: list[Callable] = []              # MCP notification callbacks
+        self._tokens_path: Path = queue.data_dir / "fcm_tokens.json"
+        self._fcm_tokens: dict[str, str] = self._load_tokens()  # device_id → fcm_token (persisted)
 
     # ── Device lifecycle ─────────────────────────────────────────────────────
 
     def register_device(self, connection: DeviceConnection):
         """Called when an Android device connects and sends device.hello."""
         self._devices[connection.device_id] = connection
+        # Persist FCM token so we can wake this device even after a server restart
+        if connection.fcm_token:
+            self._fcm_tokens[connection.device_id] = connection.fcm_token
+            self._save_tokens()
         log.info(f"Device registered: {connection.device_id} ({connection.device_name})")
 
     def unregister_device(self, device_id: str):
@@ -149,16 +159,54 @@ class MessageRouter:
         return next(iter(self._devices), None)
 
     def _get_fcm_token(self, device_id: str) -> str | None:
-        # TODO: persist FCM tokens to disk so they survive server restarts
-        device = self._devices.get(device_id)
-        return device.fcm_token if device else None
+        """
+        Returns the FCM token for a device.
+        Checks the live connection first, then falls back to the persisted token
+        so we can still wake a device that is currently disconnected.
+        """
+        live = self._devices.get(device_id)
+        if live and live.fcm_token:
+            return live.fcm_token
+        # Fallback: try "any" if no device_id was specified
+        if device_id == "any":
+            return next(iter(self._fcm_tokens.values()), None)
+        return self._fcm_tokens.get(device_id)
+
+    def _load_tokens(self) -> dict[str, str]:
+        """Load persisted FCM tokens from disk."""
+        if self._tokens_path.exists():
+            try:
+                return json.loads(self._tokens_path.read_text())
+            except Exception as e:
+                log.warning(f"Could not load FCM tokens: {e}")
+        return {}
+
+    def _save_tokens(self):
+        """Persist FCM tokens to disk."""
+        try:
+            self._tokens_path.write_text(json.dumps(self._fcm_tokens, indent=2))
+        except Exception as e:
+            log.warning(f"Could not save FCM tokens: {e}")
 
     def list_devices(self) -> list[dict]:
-        return [
-            {
+        """
+        Returns all known devices — both currently connected and previously seen.
+        Connected devices have live WebSocket connections; disconnected ones are
+        known from persisted FCM tokens.
+        """
+        seen: dict[str, dict] = {}
+        # Previously seen (may or may not be currently connected)
+        for device_id in self._fcm_tokens:
+            seen[device_id] = {
+                "device_id": device_id,
+                "name": device_id,
+                "connected": False,
+            }
+        # Override with live connection details
+        for d in self._devices.values():
+            seen[d.device_id] = {
                 "device_id": d.device_id,
                 "name": d.device_name,
                 "connected": True,
             }
-            for d in self._devices.values()
-        ]
+        return list(seen.values())

@@ -17,6 +17,11 @@ class Config:
     MCP_PORT: int = int(os.getenv("MCP_PORT", "8080"))
     WS_PORT: int = int(os.getenv("WS_PORT", "8765"))
 
+    # Public WebSocket URL embedded in the setup QR code.
+    # Must be the externally reachable address of this server.
+    # Defaults to localhost for local development.
+    WS_URL: str = os.getenv("WS_URL", f"ws://localhost:{int(os.getenv('WS_PORT', '8765'))}")
+
     # FCM
     FCM_SERVICE_ACCOUNT_PATH: str = os.getenv(
         "FCM_SERVICE_ACCOUNT_PATH", "/secrets/fcm-service-account.json"

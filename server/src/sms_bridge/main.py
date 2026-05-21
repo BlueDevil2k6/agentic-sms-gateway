@@ -35,6 +35,7 @@ async def run():
         router=router,
         port=config.MCP_PORT,
         api_key=config.API_KEY,
+        ws_url=config.WS_URL,
     )
 
     # Run all servers concurrently

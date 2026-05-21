@@ -6,6 +6,7 @@ All connections must present a valid API key in the Authorization header
 during the WebSocket upgrade handshake.
 """
 
+import asyncio
 import json
 import logging
 
@@ -91,4 +92,3 @@ class WebSocketServer:
             log.warning(f"Unknown message type from {device_id}: {msg_type}")
 
 
-import asyncio  # noqa: E402 — imported here to avoid circular at module load

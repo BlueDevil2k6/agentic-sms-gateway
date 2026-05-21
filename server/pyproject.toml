@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "sms-bridge"
 version = "0.1.0"
 description = "SMS Gateway server — bridges AI agents (MCP) to an Android SMS device (WebSocket)"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "mcp[cli]>=1.0.0",          # MCP server SDK (agent-facing)
     "websockets>=12.0",          # WebSocket server (Android-facing)
