@@ -1,0 +1,19 @@
+services:
+  sms-bridge:
+    build: .
+    container_name: sms-bridge
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # MCP SSE server (agent-facing)
+      - "8765:8765"   # WebSocket server (Android-facing)
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data                              # message queue persistence
+      - ./fcm-service-account.json:/secrets/fcm-service-account.json:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
