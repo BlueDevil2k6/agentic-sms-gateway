@@ -27,6 +27,7 @@ android/local.properties
 android/*.keystore
 android/app/build/
 android/.idea/
+android/app/google-services.json   # real file — never commit
 *.iml
 
 # macOS

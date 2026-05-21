@@ -1,0 +1,71 @@
+[versions]
+agp                  = "8.5.2"
+kotlin               = "2.0.20"
+ksp                  = "2.0.20-1.0.24"
+hilt                 = "2.52"
+compose-bom          = "2024.09.03"
+navigation-compose   = "2.8.2"
+activity-compose     = "1.9.2"
+lifecycle            = "2.8.6"
+camerax              = "1.3.4"
+mlkit-barcode        = "17.3.0"
+okhttp               = "4.12.0"
+firebase-bom         = "33.4.0"
+security-crypto      = "1.1.0-alpha06"
+coroutines           = "1.9.0"
+core-ktx             = "1.13.1"
+
+[libraries]
+# AndroidX Core
+core-ktx                    = { group = "androidx.core",             name = "core-ktx",                       version.ref = "core-ktx" }
+activity-compose            = { group = "androidx.activity",         name = "activity-compose",               version.ref = "activity-compose" }
+
+# Lifecycle
+lifecycle-runtime-ktx       = { group = "androidx.lifecycle",        name = "lifecycle-runtime-ktx",          version.ref = "lifecycle" }
+lifecycle-viewmodel-compose = { group = "androidx.lifecycle",        name = "lifecycle-viewmodel-compose",    version.ref = "lifecycle" }
+lifecycle-runtime-compose   = { group = "androidx.lifecycle",        name = "lifecycle-runtime-compose",      version.ref = "lifecycle" }
+lifecycle-service           = { group = "androidx.lifecycle",        name = "lifecycle-service",              version.ref = "lifecycle" }
+
+# Compose
+compose-bom                 = { group = "androidx.compose",          name = "compose-bom",                    version.ref = "compose-bom" }
+compose-ui                  = { group = "androidx.compose.ui",       name = "ui" }
+compose-ui-tooling-preview  = { group = "androidx.compose.ui",       name = "ui-tooling-preview" }
+compose-ui-tooling          = { group = "androidx.compose.ui",       name = "ui-tooling" }
+compose-material3           = { group = "androidx.compose.material3", name = "material3" }
+compose-icons-extended      = { group = "androidx.compose.material", name = "material-icons-extended" }
+
+# Navigation
+navigation-compose          = { group = "androidx.navigation",       name = "navigation-compose",             version.ref = "navigation-compose" }
+
+# Hilt
+hilt-android                = { group = "com.google.dagger",         name = "hilt-android",                   version.ref = "hilt" }
+hilt-compiler               = { group = "com.google.dagger",         name = "hilt-android-compiler",          version.ref = "hilt" }
+hilt-navigation-compose     = { group = "androidx.hilt",             name = "hilt-navigation-compose",        version = "1.2.0" }
+
+# Camera + ML Kit (QR scanning)
+camerax-core                = { group = "androidx.camera",           name = "camera-core",                    version.ref = "camerax" }
+camerax-camera2             = { group = "androidx.camera",           name = "camera-camera2",                 version.ref = "camerax" }
+camerax-lifecycle           = { group = "androidx.camera",           name = "camera-lifecycle",               version.ref = "camerax" }
+camerax-view                = { group = "androidx.camera",           name = "camera-view",                    version.ref = "camerax" }
+mlkit-barcode               = { group = "com.google.mlkit",          name = "barcode-scanning",               version.ref = "mlkit-barcode" }
+
+# OkHttp (WebSocket)
+okhttp                      = { group = "com.squareup.okhttp3",      name = "okhttp",                         version.ref = "okhttp" }
+
+# Firebase
+firebase-bom                = { group = "com.google.firebase",       name = "firebase-bom",                   version.ref = "firebase-bom" }
+firebase-messaging          = { group = "com.google.firebase",       name = "firebase-messaging-ktx" }
+
+# Security
+security-crypto             = { group = "androidx.security",         name = "security-crypto",                version.ref = "security-crypto" }
+
+# Coroutines
+coroutines-android          = { group = "org.jetbrains.kotlinx",     name = "kotlinx-coroutines-android",     version.ref = "coroutines" }
+
+[plugins]
+android-application  = { id = "com.android.application",        version.ref = "agp" }
+kotlin-android       = { id = "org.jetbrains.kotlin.android",   version.ref = "kotlin" }
+kotlin-compose       = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+hilt                 = { id = "com.google.dagger.hilt.android",  version.ref = "hilt" }
+ksp                  = { id = "com.google.devtools.ksp",         version.ref = "ksp" }
+google-services      = { id = "com.google.gms.google-services",  version = "4.4.2" }

@@ -1,0 +1,24 @@
+{
+  "_comment": "Rename this file to google-services.json and replace with your real Firebase project config.",
+  "_instructions": [
+    "1. Go to https://console.firebase.google.com",
+    "2. Create a project (or use an existing one)",
+    "3. Add an Android app with package name: com.agentic.smsbridge",
+    "4. Download google-services.json and place it in android/app/",
+    "5. Enable Cloud Messaging in Firebase Console → your project → Cloud Messaging"
+  ],
+  "project_info": {
+    "project_number": "YOUR_PROJECT_NUMBER",
+    "project_id": "YOUR_PROJECT_ID",
+    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
+  },
+  "client": [{
+    "client_info": {
+      "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_APP_ID",
+      "android_client_info": { "package_name": "com.agentic.smsbridge" }
+    },
+    "api_key": [{ "current_key": "YOUR_API_KEY" }],
+    "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+  }],
+  "configuration_version": "1"
+}
