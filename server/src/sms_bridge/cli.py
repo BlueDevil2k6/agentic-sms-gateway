@@ -21,11 +21,43 @@ from rich.panel import Panel
 from rich.table import Table
 from rich import box
 
-from sms_bridge.config import Config, DEFAULT_DATA_DIR
+from sms_bridge.config import Config, DEFAULT_DATA_DIR, SMS_GATEWAY_DIR
 from sms_bridge.config_store import ConfigStore, generate_api_key
 
 console = Console()
 store   = ConfigStore()
+
+# Fixed paths — everything lives under ~/.sms-gateway
+FCM_STUB_PATH = SMS_GATEWAY_DIR / "fcm-service-account.json"
+
+FCM_STUB_CONTENT = {
+    "_stub": True,
+    "_instructions": [
+        "Replace this file with your real Firebase service account JSON.",
+        "",
+        "How to get your FCM service account JSON:",
+        "  1. Go to https://console.firebase.google.com",
+        "  2. Open your project (or create one for this app)",
+        "  3. Click the gear icon → Project Settings",
+        "  4. Go to the 'Service accounts' tab",
+        "  5. Click 'Generate new private key' → 'Generate key'",
+        "  6. Overwrite this file with the downloaded JSON:",
+        f"     {SMS_GATEWAY_DIR}/fcm-service-account.json",
+        "",
+        "Without a real credential, FCM wake-up is disabled.",
+        "SMS still works as long as the device WebSocket stays connected.",
+    ],
+    "type": "service_account",
+    "project_id": "YOUR_PROJECT_ID",
+    "private_key_id": "YOUR_KEY_ID",
+    "private_key": "-----BEGIN RSA PRIVATE KEY-----\nREPLACE_WITH_REAL_KEY\n-----END RSA PRIVATE KEY-----\n",
+    "client_email": "firebase-adminsdk@YOUR_PROJECT_ID.iam.gserviceaccount.com",
+    "client_id": "YOUR_CLIENT_ID",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk%40YOUR_PROJECT_ID.iam.gserviceaccount.com",
+}
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,7 +117,7 @@ def _detect_ips() -> list[tuple[str, str]]:
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
-@click.version_option(version="0.1.1", prog_name="sms-bridge")
+@click.version_option(version="0.1.2", prog_name="sms-bridge")
 def cli() -> None:
     """SMS Bridge — Android SMS gateway for AI agents via MCP."""
 
@@ -221,43 +253,48 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
 
     resolved_ws_url = _build_ws_url(resolved_host, resolved_ws, use_ssl)
 
-    # ── Step 3: Firebase ──────────────────────────────────────────────────────
-    console.rule("[bold]Step 3 · Firebase / FCM (optional)[/bold]")
+    # ── Step 3: Firebase / FCM ────────────────────────────────────────────────
+    console.rule("[bold]Step 3 · Firebase / FCM[/bold]")
     console.print()
 
-    default_fcm = existing.get("fcm_service_account_path", "")
-    if non_interactive:
-        resolved_fcm = fcm_path or default_fcm
-    else:
-        console.print(
-            "Path to your [bold]FCM service account JSON[/bold] file.\n"
-            "[dim]Enables push-wake when the Android WebSocket is closed.\n"
-            "Press Enter to skip — SMS delivery will still work if the device stays connected.[/dim]"
-        )
-        raw_fcm = click.prompt(
-            "FCM service account path",
-            default=default_fcm or "",
-            show_default=bool(default_fcm),
-            prompt_suffix="\n  > ",
-        )
-        resolved_fcm = raw_fcm.strip()
-        if resolved_fcm and not Path(resolved_fcm).exists():
-            console.print(f"  [yellow]⚠ File not found: {resolved_fcm}[/yellow]  (saved anyway — fix the path before starting)")
-    console.print()
+    # Create the stub file if it doesn't already contain real credentials
+    from sms_bridge.fcm.client import _is_stub
+    if not FCM_STUB_PATH.exists() or _is_stub(str(FCM_STUB_PATH)):
+        FCM_STUB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        FCM_STUB_PATH.write_text(json.dumps(FCM_STUB_CONTENT, indent=2))
+        FCM_STUB_PATH.chmod(0o600)
+
+    resolved_fcm = str(FCM_STUB_PATH)
+
+    if not non_interactive:
+        if _is_stub(resolved_fcm):
+            console.print(
+                f"A placeholder FCM credentials file has been created at:\n"
+                f"  [bold cyan]{FCM_STUB_PATH}[/bold cyan]\n"
+            )
+            console.print(
+                "[dim]To enable FCM wake-up (recommended for reliable delivery):[/dim]\n"
+                "  1. Go to [link=https://console.firebase.google.com]console.firebase.google.com[/link]\n"
+                "  2. Project Settings → Service accounts → [bold]Generate new private key[/bold]\n"
+                f"  3. Overwrite [cyan]{FCM_STUB_PATH}[/cyan] with the downloaded JSON\n"
+            )
+            console.print(
+                "[dim]SMS still works without this — the device just needs to keep its\n"
+                "WebSocket connection open.[/dim]\n"
+            )
+        else:
+            console.print(f"[green]✓ Real FCM credentials found at {FCM_STUB_PATH}[/green]\n")
 
     # ── Step 4: Storage ───────────────────────────────────────────────────────
     console.rule("[bold]Step 4 · Storage[/bold]")
     console.print()
 
-    default_dd = existing.get("data_dir", str(DEFAULT_DATA_DIR))
-    if non_interactive:
-        resolved_dd = data_dir or default_dd
-    else:
+    resolved_dd = data_dir or str(DEFAULT_DATA_DIR)
+    if not non_interactive:
         console.print(
-            "[bold]Message queue directory[/bold]\n"
-            "[dim]Inbound and outbound SMS files are stored here.[/dim]"
+            f"Message queue directory: [cyan]{resolved_dd}[/cyan]\n"
+            "[dim]Inbound and outbound SMS files are stored here.[/dim]\n"
         )
-        resolved_dd = click.prompt("  Data directory", default=default_dd, prompt_suffix="\n  > ")
     console.print()
 
     log_choices = ["DEBUG", "INFO", "WARNING", "ERROR"]
@@ -299,7 +336,8 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
     t.add_row("API key",        _mask(resolved_api_key))
     t.add_row("MCP endpoint",   f"http://{resolved_host}:{resolved_mcp}/mcp")
     t.add_row("WebSocket URL",  resolved_ws_url)
-    t.add_row("FCM",            resolved_fcm or "[dim]disabled[/dim]")
+    fcm_status = "[yellow]stub — replace with real credentials[/yellow]" if _is_stub(resolved_fcm) else f"[green]{resolved_fcm}[/green]"
+    t.add_row("FCM",            fcm_status)
     t.add_row("Data dir",       resolved_dd)
     console.print(t)
 

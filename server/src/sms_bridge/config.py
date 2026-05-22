@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 
-DEFAULT_DATA_DIR = Path.home() / ".local" / "share" / "sms-bridge"
+SMS_GATEWAY_DIR  = Path.home() / ".sms-gateway"
+DEFAULT_DATA_DIR = SMS_GATEWAY_DIR / "data"
 
 
 @dataclass

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from sms_bridge.config import Config
 
-_CONFIG_DIR  = Path.home() / ".config" / "sms-bridge"
+_CONFIG_DIR  = Path.home() / ".sms-gateway"
 _CONFIG_FILE = _CONFIG_DIR / "config.json"
 
 
