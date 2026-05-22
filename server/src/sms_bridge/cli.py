@@ -85,7 +85,7 @@ def _detect_ips() -> list[tuple[str, str]]:
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="sms-bridge")
+@click.version_option(version="0.1.1", prog_name="sms-bridge")
 def cli() -> None:
     """SMS Bridge — Android SMS gateway for AI agents via MCP."""
 
