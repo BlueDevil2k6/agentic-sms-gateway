@@ -35,6 +35,12 @@ class BridgeService : LifecycleService() {
 
     private var wakeLock: PowerManager.WakeLock? = null
 
+    // Guard against double-initialisation: onStartCommand is called every time
+    // startForegroundService() is called, even when the service is already running.
+    // Without this flag a second connect() + coroutine would fire on every
+    // DashboardScreen recomposition, causing a disconnect/reconnect storm.
+    @Volatile private var isStarted = false
+
     // ── Service lifecycle ─────────────────────────────────────────────────
 
     override fun onCreate() {
@@ -49,16 +55,22 @@ class BridgeService : LifecycleService() {
         startForeground(
             NOTIFICATION_ID,
             buildNotification("Connecting…"),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING,
         )
 
-        acquireWakeLock()
-        startBridge()
+        if (!isStarted) {
+            isStarted = true
+            acquireWakeLock()
+            startBridge()
+        } else {
+            Log.d(TAG, "onStartCommand: already running — skipping re-init")
+        }
 
         return START_STICKY   // OS restarts the service if killed
     }
 
     override fun onDestroy() {
+        isStarted = false
         wsClient.disconnect()
         releaseWakeLock()
         Log.i(TAG, "BridgeService destroyed")
@@ -158,8 +170,11 @@ class BridgeService : LifecycleService() {
         .setContentIntent(
             PendingIntent.getActivity(
                 this, 0,
-                Intent(this, MainActivity::class.java),
-                PendingIntent.FLAG_IMMUTABLE,
+                Intent(this, MainActivity::class.java).apply {
+                    // Bring existing task to front rather than creating a new instance.
+                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                },
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
             )
         )
         .build()
