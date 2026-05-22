@@ -9,6 +9,8 @@ during the WebSocket upgrade handshake.
 import asyncio
 import json
 import logging
+import ssl
+from pathlib import Path
 
 import websockets
 from websockets.asyncio.server import ServerConnection
@@ -19,14 +21,40 @@ log = logging.getLogger(__name__)
 
 
 class WebSocketServer:
-    def __init__(self, router: MessageRouter, port: int, api_key: str):
+    def __init__(
+        self,
+        router: MessageRouter,
+        port: int,
+        api_key: str,
+        tls_cert_path: str = "",
+        tls_key_path: str = "",
+    ):
         self.router = router
         self.port = port
         self.api_key = api_key
+        self.tls_cert_path = tls_cert_path
+        self.tls_key_path = tls_key_path
+
+    def _build_ssl_context(self) -> ssl.SSLContext | None:
+        if not (self.tls_cert_path and self.tls_key_path):
+            return None
+        cert = Path(self.tls_cert_path)
+        key = Path(self.tls_key_path)
+        if not cert.exists() or not key.exists():
+            log.warning(
+                "TLS cert or key file not found — falling back to plain ws://. "
+                f"cert={self.tls_cert_path} key={self.tls_key_path}"
+            )
+            return None
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ctx.load_cert_chain(certfile=str(cert), keyfile=str(key))
+        return ctx
 
     async def serve(self):
-        log.info(f"WebSocket server listening on ws://0.0.0.0:{self.port}")
-        async with websockets.serve(self._handle, "0.0.0.0", self.port):
+        ssl_ctx = self._build_ssl_context()
+        scheme = "wss" if ssl_ctx else "ws"
+        log.info(f"WebSocket server listening on {scheme}://0.0.0.0:{self.port}")
+        async with websockets.serve(self._handle, "0.0.0.0", self.port, ssl=ssl_ctx):
             await asyncio.get_running_loop().create_future()  # run forever
 
     async def _handle(self, ws: ServerConnection):

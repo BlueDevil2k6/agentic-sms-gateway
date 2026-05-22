@@ -36,6 +36,8 @@ store   = ConfigStore()
 FCM_STUB_PATH = SMS_GATEWAY_DIR / "fcm-service-account.json"
 PID_FILE      = SMS_GATEWAY_DIR / "sms-bridge.pid"
 LOG_FILE      = SMS_GATEWAY_DIR / "sms-bridge.log"
+TLS_CERT_PATH = SMS_GATEWAY_DIR / "cert.pem"
+TLS_KEY_PATH  = SMS_GATEWAY_DIR / "key.pem"
 
 FCM_STUB_CONTENT = {
     "_stub": True,
@@ -132,10 +134,63 @@ def _detect_ips() -> list[tuple[str, str]]:
         return []
 
 
+def _generate_self_signed_cert(host: str, cert_path: Path, key_path: Path) -> None:
+    """
+    Generate a self-signed TLS certificate using Python's cryptography library
+    (already a transitive dependency via firebase-admin / google-auth).
+    The cert includes the host as a SAN so modern TLS stacks accept it.
+    """
+    import datetime
+    import ipaddress
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+
+    # Generate 2048-bit RSA key
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    # Build Subject Alternative Name — IP or DNS depending on what host looks like
+    san: list[x509.GeneralName] = [x509.DNSName("localhost")]
+    try:
+        san.append(x509.IPAddress(ipaddress.ip_address(host)))
+    except ValueError:
+        san.append(x509.DNSName(host))
+
+    subject = issuer = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, host),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "SMS Bridge (self-signed)"),
+    ])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=3650))  # 10 years
+        .add_extension(x509.SubjectAlternativeName(san), critical=False)
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(key, hashes.SHA256())
+    )
+
+    cert_path.parent.mkdir(parents=True, exist_ok=True)
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    cert_path.chmod(0o644)          # cert is public — readable by anyone
+    key_path.write_bytes(key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.NoEncryption(),
+    ))
+    key_path.chmod(0o600)           # key is private — owner-only
+
+
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
-@click.version_option(version="0.1.4", prog_name="sms-bridge")
+@click.version_option(version="0.1.5", prog_name="sms-bridge")
 def cli() -> None:
     """SMS Bridge — Android SMS gateway for AI agents via MCP."""
 
@@ -261,14 +316,80 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
     is_local = resolved_host in ("localhost", "127.0.0.1", "::1")
     if non_interactive or is_local:
         use_ssl = not is_local
+        resolved_cert = ""
+        resolved_key  = ""
     else:
         console.print(
             "[bold]SSL / TLS[/bold]\n"
-            "[dim]Use wss:// (recommended for production) or ws:// (local / behind a TLS proxy).[/dim]"
+            "[dim]Use wss:// (recommended) or ws:// (local / behind an external TLS proxy).[/dim]"
         )
         use_ssl = click.confirm("  Use SSL (wss://)?", default=True)
-    console.print()
 
+        resolved_cert = ""
+        resolved_key  = ""
+        if use_ssl:
+            console.print()
+            existing_cert = existing.get("tls_cert_path", "")
+            existing_key  = existing.get("tls_key_path", "")
+            has_existing  = existing_cert and Path(existing_cert).exists()
+
+            console.print(
+                "[bold]TLS certificate[/bold]\n"
+                "[dim]Choose a source for the TLS certificate:[/dim]\n"
+            )
+            console.print("  [bold]1[/bold]  Auto-generate a self-signed certificate (easiest — good for testing)")
+            console.print("  [bold]2[/bold]  Use existing cert files (Let's Encrypt or your own)")
+            if has_existing:
+                console.print(f"  [bold]3[/bold]  Keep existing cert ({existing_cert})")
+            console.print()
+
+            max_choice = 3 if has_existing else 2
+            cert_choice = click.prompt("  Select", type=click.IntRange(1, max_choice), default=1)
+
+            if cert_choice == 1:
+                console.print()
+                console.print(f"  Generating self-signed cert for [cyan]{resolved_host}[/cyan]…")
+                try:
+                    _generate_self_signed_cert(resolved_host, TLS_CERT_PATH, TLS_KEY_PATH)
+                    resolved_cert = str(TLS_CERT_PATH)
+                    resolved_key  = str(TLS_KEY_PATH)
+                    console.print(f"  [green]✓ Cert →  {TLS_CERT_PATH}[/green]")
+                    console.print(f"  [green]✓ Key  →  {TLS_KEY_PATH}[/green]")
+                    console.print()
+                    console.print(Panel(
+                        "[bold]Install the certificate on your Android device[/bold]\n\n"
+                        "The Android app must trust this self-signed cert.\n\n"
+                        "  [bold]Option A — ADB (USB cable)[/bold]\n"
+                        f"    adb push {TLS_CERT_PATH} /sdcard/sms-bridge-cert.pem\n"
+                        "    Then on the phone: Settings → Security →\n"
+                        "      Encryption & credentials → Install a certificate → CA certificate\n\n"
+                        "  [bold]Option B — QR / URL[/bold]\n"
+                        "    Host the cert file somewhere the phone can reach and open it.\n\n"
+                        "[dim]You only need to do this once per device.[/dim]",
+                        border_style="cyan",
+                        title="[cyan]One-time setup[/cyan]",
+                    ))
+                except ImportError:
+                    console.print("[red]✗ cryptography package not available — run: pip install cryptography[/red]")
+                    use_ssl = False
+
+            elif cert_choice == 2:
+                resolved_cert = click.prompt(
+                    "  Path to cert file (PEM)",
+                    default=existing_cert or "/etc/letsencrypt/live/yourdomain/fullchain.pem",
+                    prompt_suffix="\n  > ",
+                )
+                resolved_key = click.prompt(
+                    "  Path to key file (PEM)",
+                    default=existing_key or "/etc/letsencrypt/live/yourdomain/privkey.pem",
+                    prompt_suffix="\n  > ",
+                )
+            else:
+                # Keep existing
+                resolved_cert = existing_cert
+                resolved_key  = existing_key
+
+    console.print()
     resolved_ws_url = _build_ws_url(resolved_host, resolved_ws, use_ssl)
 
     # ── Step 3: Firebase / FCM ────────────────────────────────────────────────
@@ -332,6 +453,8 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
         mcp_port=resolved_mcp,
         ws_port=resolved_ws,
         ws_url=resolved_ws_url,
+        tls_cert_path=resolved_cert,
+        tls_key_path=resolved_key,
         fcm_service_account_path=resolved_fcm,
         data_dir=Path(resolved_dd),
         log_level=resolved_ll,
@@ -354,6 +477,8 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
     t.add_row("API key",        _mask(resolved_api_key))
     t.add_row("MCP endpoint",   f"http://{resolved_host}:{resolved_mcp}/mcp")
     t.add_row("WebSocket URL",  resolved_ws_url)
+    tls_status = f"[green]{resolved_cert}[/green]" if resolved_cert else "[dim]disabled (ws://)[/dim]"
+    t.add_row("TLS cert",       tls_status)
     fcm_status = "[yellow]stub — replace with real credentials[/yellow]" if _is_stub(resolved_fcm) else f"[green]{resolved_fcm}[/green]"
     t.add_row("FCM",            fcm_status)
     t.add_row("Data dir",       resolved_dd)
@@ -413,10 +538,12 @@ def start(foreground: bool) -> None:
             ))
             console.print()
 
+        tls_enabled = bool(cfg.tls_cert_path and Path(cfg.tls_cert_path).exists())
         console.print(Panel(
-            f"[bold green]SMS Bridge v0.1.4[/bold green]\n\n"
+            f"[bold green]SMS Bridge v0.1.5[/bold green]\n\n"
             f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
             f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
+            f"  TLS   →  {'[green]enabled[/green]' if tls_enabled else '[dim]disabled (ws://)[/dim]'}\n"
             f"  Data  →  [dim]{cfg.data_dir}[/dim]\n"
             f"  FCM   →  {'[yellow]disabled (stub)[/yellow]' if fcm_missing else '[green]enabled[/green]'}\n\n"
             f"[dim]Press Ctrl+C to stop[/dim]",
@@ -451,6 +578,7 @@ def start(foreground: bool) -> None:
     )
     PID_FILE.write_text(str(proc.pid))
 
+    tls_enabled = bool(cfg.tls_cert_path and Path(cfg.tls_cert_path).exists())
     console.print()
     if fcm_missing:
         console.print(
@@ -459,10 +587,11 @@ def start(foreground: bool) -> None:
         )
 
     console.print(Panel(
-        f"[bold green]SMS Bridge v0.1.4 started[/bold green]  "
+        f"[bold green]SMS Bridge v0.1.5 started[/bold green]  "
         f"[dim](PID {proc.pid})[/dim]\n\n"
         f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
         f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
+        f"  TLS   →  {'[green]enabled[/green]' if tls_enabled else '[dim]disabled (ws://)[/dim]'}\n"
         f"  Logs  →  [dim]{LOG_FILE}[/dim]\n\n"
         f"  [dim]sms-bridge stop[/dim]  to stop the server\n"
         f"  [dim]sms-bridge logs[/dim]  to tail the log",
@@ -576,6 +705,52 @@ def qr(device_name: str, save: bool) -> None:
         console.print()
 
 
+# ── gencert ───────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--host", "-h", default=None,
+              help="IP or hostname to embed in the certificate SAN. Defaults to the configured host.")
+@click.option("--days", default=3650, show_default=True,
+              help="Certificate validity in days.")
+def gencert(host: str | None, days: int) -> None:
+    """Generate (or regenerate) a self-signed TLS certificate."""
+    cfg = store.load_raw() or {}
+    resolved_host = host or cfg.get("_host") or "localhost"
+
+    console.print()
+    console.print(f"Generating self-signed TLS certificate for [cyan]{resolved_host}[/cyan]…")
+
+    try:
+        _generate_self_signed_cert(resolved_host, TLS_CERT_PATH, TLS_KEY_PATH)
+    except ImportError:
+        console.print("[red]✗ The 'cryptography' package is required:[/red]  pip install cryptography")
+        sys.exit(1)
+
+    # Persist cert/key paths into config
+    if cfg:
+        cfg["tls_cert_path"] = str(TLS_CERT_PATH)
+        cfg["tls_key_path"]  = str(TLS_KEY_PATH)
+        store.path.write_text(json.dumps(cfg, indent=2))
+
+    console.print(f"[green]✓ Cert  →  {TLS_CERT_PATH}[/green]")
+    console.print(f"[green]✓ Key   →  {TLS_KEY_PATH}[/green]")
+    console.print()
+    console.print(Panel(
+        "[bold]Install the certificate on your Android device[/bold]\n\n"
+        "  [bold]Option A — ADB (USB cable)[/bold]\n"
+        f"    adb push {TLS_CERT_PATH} /sdcard/sms-bridge-cert.pem\n"
+        "    Phone: Settings → Security →\n"
+        "      Encryption & credentials → Install a certificate → CA certificate\n\n"
+        "  [bold]Option B — copy via SCP / email / web[/bold]\n"
+        "    Transfer cert.pem to the phone, open it, install as CA certificate.\n\n"
+        "[dim]You only need to do this once per device. Then restart the server:[/dim]\n"
+        "  sms-bridge stop && sms-bridge start",
+        border_style="cyan",
+        title="[cyan]One-time device setup[/cyan]",
+    ))
+    console.print()
+
+
 # ── status ────────────────────────────────────────────────────────────────────
 
 @cli.command()
@@ -603,6 +778,8 @@ def status() -> None:
     t.add_row("API key",           _mask(cfg.api_key))
     t.add_row("MCP port",          str(cfg.mcp_port))
     t.add_row("WebSocket URL",     cfg.ws_url)
+    tls_val = cfg.tls_cert_path if cfg.tls_cert_path else "[dim]disabled[/dim]"
+    t.add_row("TLS certificate",   tls_val)
     t.add_row("FCM credentials",   cfg.fcm_service_account_path or "[dim]not configured[/dim]")
     t.add_row("Data directory",    str(cfg.data_dir))
     t.add_row("Message retention", f"{cfg.message_retention_days} days")

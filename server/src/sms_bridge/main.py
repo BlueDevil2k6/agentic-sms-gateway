@@ -21,7 +21,7 @@ async def run(cfg: Config) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     log = logging.getLogger(__name__)
-    log.info("Starting Agentic SMS Gateway v0.1.4")
+    log.info("Starting Agentic SMS Gateway v0.1.5")
     log.info("  MCP  → http://0.0.0.0:%d/mcp", cfg.mcp_port)
     log.info("  WS   → %s", cfg.ws_url)
     log.info("  Data → %s", cfg.data_dir)
@@ -36,6 +36,8 @@ async def run(cfg: Config) -> None:
         router=router,
         port=cfg.ws_port,
         api_key=cfg.api_key,
+        tls_cert_path=cfg.tls_cert_path,
+        tls_key_path=cfg.tls_key_path,
     )
     mcp_server = MCPServer(
         router=router,

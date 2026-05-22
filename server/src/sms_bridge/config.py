@@ -26,6 +26,10 @@ class Config:
     # Must be the externally reachable address of this server.
     ws_url: str = ""
 
+    # TLS (optional — enables wss:// on the WebSocket listener)
+    tls_cert_path: str = ""
+    tls_key_path: str = ""
+
     # FCM
     fcm_service_account_path: str = ""
 
@@ -56,6 +60,8 @@ class Config:
             mcp_port=int(os.getenv("MCP_PORT", "8080")),
             ws_port=int(os.getenv("WS_PORT", "8765")),
             ws_url=os.getenv("WS_URL", ""),
+            tls_cert_path=os.getenv("TLS_CERT_PATH", ""),
+            tls_key_path=os.getenv("TLS_KEY_PATH", ""),
             fcm_service_account_path=os.getenv("FCM_SERVICE_ACCOUNT_PATH", ""),
             data_dir=Path(os.getenv("DATA_DIR", str(DEFAULT_DATA_DIR))),
             message_retention_days=int(os.getenv("MESSAGE_RETENTION_DAYS", "7")),
@@ -71,6 +77,8 @@ class Config:
             mcp_port=int(d.get("mcp_port", 8080)),
             ws_port=int(d.get("ws_port", 8765)),
             ws_url=d.get("ws_url", ""),
+            tls_cert_path=d.get("tls_cert_path", ""),
+            tls_key_path=d.get("tls_key_path", ""),
             fcm_service_account_path=d.get("fcm_service_account_path", ""),
             data_dir=Path(d.get("data_dir", str(DEFAULT_DATA_DIR))),
             message_retention_days=int(d.get("message_retention_days", 7)),
@@ -85,6 +93,8 @@ class Config:
             "mcp_port": self.mcp_port,
             "ws_port": self.ws_port,
             "ws_url": self.ws_url,
+            "tls_cert_path": self.tls_cert_path,
+            "tls_key_path": self.tls_key_path,
             "fcm_service_account_path": self.fcm_service_account_path,
             "data_dir": str(self.data_dir),
             "message_retention_days": self.message_retention_days,
