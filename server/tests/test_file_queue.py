@@ -30,6 +30,7 @@ def test_enqueue_outbound_creates_file(queue, tmp_path):
 
 def test_claim_next_outbound_is_atomic(queue, tmp_path):
     queue.enqueue_outbound(to="+1111", body="msg1", device_id="dev-1")
+    time.sleep(0.01)  # ensure distinct millisecond timestamps for FIFO ordering
     queue.enqueue_outbound(to="+2222", body="msg2", device_id="dev-1")
 
     claimed = queue.claim_next_outbound("dev-1")

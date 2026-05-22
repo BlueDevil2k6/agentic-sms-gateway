@@ -6,16 +6,21 @@ build-backend = "hatchling.build"
 name = "sms-bridge"
 version = "0.1.0"
 description = "SMS Gateway server — bridges AI agents (MCP) to an Android SMS device (WebSocket)"
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["sms", "mcp", "android", "ai-agent", "gateway"]
 dependencies = [
-    "mcp[cli]>=1.0.0",          # MCP server SDK (agent-facing)
-    "websockets>=12.0",          # WebSocket server (Android-facing)
-    "firebase-admin>=6.0.0",     # FCM push notifications
-    "fastapi>=0.110.0",          # REST fallback API
-    "uvicorn[standard]>=0.29.0", # ASGI server
-    "python-dotenv>=1.0.0",      # .env config loading
-    "pydantic>=2.0.0",           # message schema validation
-    "qrcode[pil]>=7.4.0",        # QR code generation for Android app setup
+    "mcp[cli]>=1.0.0",           # MCP server SDK (agent-facing)
+    "websockets>=12.0",           # WebSocket server (Android-facing)
+    "firebase-admin>=6.0.0",      # FCM push notifications
+    "fastapi>=0.110.0",           # REST fallback API
+    "uvicorn[standard]>=0.29.0",  # ASGI server
+    "python-dotenv>=1.0.0",       # .env config loading (fallback)
+    "pydantic>=2.0.0",            # message schema validation
+    "qrcode[pil]>=7.4.0",         # QR code generation
+    "click>=8.1.0",               # CLI framework
+    "rich>=13.0.0",               # terminal formatting
 ]
 
 [project.optional-dependencies]
@@ -26,7 +31,9 @@ dev = [
 ]
 
 [project.scripts]
-sms-bridge = "sms_bridge.main:main"
+# `sms-bridge` is the top-level command group.
+# Sub-commands: setup · start · qr · status · reset
+sms-bridge = "sms_bridge.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/sms_bridge"]
