@@ -30,6 +30,9 @@ android/.idea/
 android/app/google-services.json   # real file — never commit
 *.iml
 
+# JVM heap dumps
+*.hprof
+
 # macOS
 .DS_Store
 
