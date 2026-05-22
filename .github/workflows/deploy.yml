@@ -1,0 +1,62 @@
+name: Deploy to server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'          # only trigger when server code changes
+      - '.github/workflows/deploy.yml'
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          cd server
+          pip install -e ".[dev]" 2>/dev/null || pip install -e .
+          pip install pytest
+
+      - name: Run tests
+        run: |
+          cd server
+          pytest tests/ -v
+
+  deploy:
+    name: Deploy
+    needs: test          # only deploy if tests pass
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "→ Pulling latest code..."
+            git pull origin main
+
+            echo "→ Restarting server..."
+            if command -v docker &> /dev/null && [ -f server/docker-compose.yml ]; then
+              cd server
+              docker compose pull
+              docker compose up -d --build
+            else
+              sudo systemctl restart sms-bridge
+            fi
+
+            echo "✓ Deploy complete"
