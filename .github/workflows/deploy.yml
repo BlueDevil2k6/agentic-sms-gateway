@@ -34,7 +34,6 @@ jobs:
     name: Deploy
     needs: test          # only deploy if tests pass
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
       - name: Deploy via SSH
