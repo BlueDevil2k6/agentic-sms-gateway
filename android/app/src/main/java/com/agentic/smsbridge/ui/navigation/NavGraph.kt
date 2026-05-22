@@ -1,6 +1,9 @@
 package com.agentic.smsbridge.ui.navigation
 
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,7 +22,13 @@ fun NavGraph(
     navController: NavHostController,
     startDestination: String,
 ) {
-    NavHost(navController = navController, startDestination = startDestination) {
+    NavHost(
+        navController     = navController,
+        startDestination  = startDestination,
+        modifier          = Modifier
+            .fillMaxSize()
+            .safeDrawingPadding(),   // respects status bar (top) + nav bar (bottom)
+    ) {
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onConfigured = {
