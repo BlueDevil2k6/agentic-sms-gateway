@@ -1,14 +1,15 @@
 """
 SMS Bridge CLI — install via pip, then:
 
-  sms-bridge setup    interactive configuration wizard
-  sms-bridge start    start the gateway server (background daemon)
-  sms-bridge stop     stop the running daemon
-  sms-bridge logs     tail the server log
-  sms-bridge send     send an outbound SMS
-  sms-bridge qr       display Android device pairing QR code
-  sms-bridge status   show current configuration and running state
-  sms-bridge reset    remove saved configuration
+  sms-bridge setup     interactive configuration wizard
+  sms-bridge start     start the gateway server (background daemon)
+  sms-bridge stop      stop the running daemon
+  sms-bridge logs      tail the server log
+  sms-bridge send      send an outbound SMS
+  sms-bridge qr        display Android device pairing QR code
+  sms-bridge status    show current configuration and running state
+  sms-bridge upgrade   upgrade to the latest version from GitHub
+  sms-bridge reset     remove saved configuration
 """
 from __future__ import annotations
 
@@ -868,6 +869,100 @@ def status() -> None:
         t.add_row("Log file",      str(LOG_FILE))
 
     console.print(t)
+    console.print()
+
+
+# ── upgrade ───────────────────────────────────────────────────────────────────
+
+_PACKAGE_URL = (
+    "git+https://github.com/BlueDevil2k6/agentic-sms-gateway.git"
+    "#subdirectory=server"
+)
+
+@cli.command()
+@click.option("--restart", is_flag=True, default=False,
+              help="Automatically restart the daemon after a successful upgrade.")
+def upgrade(restart: bool) -> None:
+    """Upgrade SMS Bridge to the latest version from GitHub."""
+    import importlib.metadata
+
+    current = importlib.metadata.version("sms-bridge")
+    console.print()
+    console.print(f"Current version: [cyan]{current}[/cyan]")
+    console.print(f"Installing latest from GitHub…\n")
+
+    was_running = _get_running_pid() is not None
+
+    # Stop the daemon first so the running process doesn't hold file locks
+    if was_running:
+        console.print("[dim]Stopping server before upgrade…[/dim]")
+        pid = _get_running_pid()
+        if pid:
+            try:
+                import signal as _signal
+                os.kill(pid, _signal.SIGTERM)
+                import time as _time
+                for _ in range(20):
+                    _time.sleep(0.25)
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        break
+            except ProcessLookupError:
+                pass
+            try:
+                PID_FILE.unlink()
+            except FileNotFoundError:
+                pass
+
+    result = subprocess.run(
+        [sys.executable, "-m", "pip", "install", "--upgrade", _PACKAGE_URL],
+        text=True,
+    )
+
+    if result.returncode != 0:
+        console.print("\n[red]✗ Upgrade failed.[/red]  Check the output above for details.")
+        # Restart the old version if we stopped it
+        if was_running:
+            console.print("[dim]Restarting previous version…[/dim]")
+            subprocess.Popen(
+                [sys.executable, "-m", "sms_bridge", "start", "--foreground"],
+                stdout=open(LOG_FILE, "a"), stderr=subprocess.STDOUT,
+                start_new_session=True, close_fds=True,
+            )
+        sys.exit(1)
+
+    # Read the new version from the freshly installed package
+    try:
+        # Force importlib to re-read metadata from disk
+        import importlib.metadata as _meta
+        new_version = _meta.version("sms-bridge")
+    except Exception:
+        new_version = "unknown"
+
+    console.print()
+    if new_version != current:
+        console.print(f"[green]✓ Upgraded[/green]  {current} → [bold]{new_version}[/bold]")
+    else:
+        console.print(f"[green]✓ Already up to date[/green]  (v{current})")
+
+    if was_running and (restart or new_version != current):
+        console.print("[dim]Restarting server…[/dim]")
+        SMS_GATEWAY_DIR.mkdir(parents=True, exist_ok=True)
+        log_fh = open(LOG_FILE, "a")
+        proc = subprocess.Popen(
+            [sys.executable, "-m", "sms_bridge", "start", "--foreground"],
+            stdout=log_fh, stderr=subprocess.STDOUT,
+            start_new_session=True, close_fds=True,
+        )
+        PID_FILE.write_text(str(proc.pid))
+        console.print(f"[green]✓ Server restarted[/green]  (PID {proc.pid})")
+    elif was_running:
+        console.print(
+            "\n[yellow]Note:[/yellow] Server was stopped for the upgrade. "
+            "Run [bold cyan]sms-bridge start[/bold cyan] to restart it."
+        )
+
     console.print()
 
 
