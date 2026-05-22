@@ -2,29 +2,33 @@
 <!--
     Network security configuration.
 
-    Allows user-installed CA certificates (e.g. a self-signed cert installed
-    on the device via Settings → Security → Install certificate).  Android 7+
-    ignores user CAs by default; this config re-enables them for this app only.
+    Trusts the self-signed CA certificate bundled at res/raw/sms_bridge_cert.pem.
+    Replace that file with YOUR server's cert before building:
 
-    cleartextTrafficPermitted="false" blocks plain ws:// everywhere except the
-    localhost domain-config below (used for emulator / local dev).
+        # On the server, generate / locate your cert:
+        sms-bridge gencert
+
+        # Copy it into the Android project (from the machine that has the source):
+        scp ubuntu@your-server:~/.sms-gateway/cert.pem \
+            android/app/src/main/res/raw/sms_bridge_cert.pem
+
+        # Rebuild and reinstall the APK.
+
+    The file committed in the repo is a localhost placeholder — it will not
+    work against a real server until you replace it with your cert.
 -->
 <network-security-config>
 
     <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
-            <!-- Trust normal system CAs (Let's Encrypt, DigiCert, etc.) -->
+            <!-- System CAs (Let's Encrypt, DigiCert, etc.) -->
             <certificates src="system"/>
-            <!-- Also trust CAs the user has manually installed on the device.
-                 Install your self-signed cert via:
-                   adb push cert.pem /sdcard/
-                 then Settings → Security → Encryption & credentials
-                      → Install a certificate → CA certificate -->
-            <certificates src="user"/>
+            <!-- Bundled self-signed CA cert — replace sms_bridge_cert.pem before building -->
+            <certificates src="@raw/sms_bridge_cert"/>
         </trust-anchors>
     </base-config>
 
-    <!-- Allow plain ws:// only for localhost / Android emulator host -->
+    <!-- Allow plain ws:// only for localhost / Android emulator host (dev only) -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="false">localhost</domain>
         <domain includeSubdomains="false">10.0.2.2</domain>

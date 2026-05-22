@@ -357,17 +357,14 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
                     console.print(f"  [green]✓ Key  →  {TLS_KEY_PATH}[/green]")
                     console.print()
                     console.print(Panel(
-                        "[bold]Install the certificate on your Android device[/bold]\n\n"
-                        "The Android app must trust this self-signed cert.\n\n"
-                        "  [bold]Option A — ADB (USB cable)[/bold]\n"
-                        f"    adb push {TLS_CERT_PATH} /sdcard/sms-bridge-cert.pem\n"
-                        "    Then on the phone: Settings → Security →\n"
-                        "      Encryption & credentials → Install a certificate → CA certificate\n\n"
-                        "  [bold]Option B — QR / URL[/bold]\n"
-                        "    Host the cert file somewhere the phone can reach and open it.\n\n"
-                        "[dim]You only need to do this once per device.[/dim]",
+                        "[bold]Bundle the certificate into your Android app[/bold]\n\n"
+                        "Copy the cert into the Android source, then rebuild:\n\n"
+                        f"  [bold cyan]scp ubuntu@your-server:{TLS_CERT_PATH} \\\\\n"
+                        "      android/app/src/main/res/raw/sms_bridge_cert.pem[/bold cyan]\n\n"
+                        "  [bold cyan]./gradlew installDebug[/bold cyan]\n\n"
+                        "[dim]Do this on the machine with the Android source code.[/dim]",
                         border_style="cyan",
-                        title="[cyan]One-time setup[/cyan]",
+                        title="[cyan]Next step[/cyan]",
                     ))
                 except ImportError:
                     console.print("[red]✗ cryptography package not available — run: pip install cryptography[/red]")
@@ -736,17 +733,18 @@ def gencert(host: str | None, days: int) -> None:
     console.print(f"[green]✓ Key   →  {TLS_KEY_PATH}[/green]")
     console.print()
     console.print(Panel(
-        "[bold]Install the certificate on your Android device[/bold]\n\n"
-        "  [bold]Option A — ADB (USB cable)[/bold]\n"
-        f"    adb push {TLS_CERT_PATH} /sdcard/sms-bridge-cert.pem\n"
-        "    Phone: Settings → Security →\n"
-        "      Encryption & credentials → Install a certificate → CA certificate\n\n"
-        "  [bold]Option B — copy via SCP / email / web[/bold]\n"
-        "    Transfer cert.pem to the phone, open it, install as CA certificate.\n\n"
-        "[dim]You only need to do this once per device. Then restart the server:[/dim]\n"
-        "  sms-bridge stop && sms-bridge start",
+        "[bold]Bundle the certificate into your Android app[/bold]\n\n"
+        "The cert must be compiled into the APK so Android trusts it.\n"
+        "Run this on the machine where you have the Android source:\n\n"
+        f"  [bold cyan]scp ubuntu@your-server:{TLS_CERT_PATH} \\\\\n"
+        "      android/app/src/main/res/raw/sms_bridge_cert.pem[/bold cyan]\n\n"
+        "Then rebuild and reinstall the app:\n\n"
+        "  [bold cyan]./gradlew installDebug[/bold cyan]\n\n"
+        "You must repeat this whenever you regenerate the certificate.\n\n"
+        "[dim]After reinstalling, re-scan the QR code and the wss:// handshake\n"
+        "will succeed.[/dim]",
         border_style="cyan",
-        title="[cyan]One-time device setup[/cyan]",
+        title="[cyan]Next step[/cyan]",
     ))
     console.print()
 
