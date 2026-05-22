@@ -30,6 +30,9 @@ fun DashboardScreen(
     val activity         = context as? Activity
     val connectionState  by viewModel.connectionState.collectAsStateWithLifecycle()
     val reconnectAttempt by viewModel.reconnectAttempt.collectAsStateWithLifecycle()
+    val inboundCount     by viewModel.inboundCount.collectAsStateWithLifecycle()
+    val outboundCount    by viewModel.outboundCount.collectAsStateWithLifecycle()
+    val lastActivity     by viewModel.lastActivity.collectAsStateWithLifecycle()
 
     // Start BridgeService when dashboard is shown
     LaunchedEffect(Unit) {
@@ -94,9 +97,9 @@ fun DashboardScreen(
 
             // ── Activity counters ────────────────────────────────────────
             ActivityCard(
-                inboundCount  = viewModel.getInboundCount(),
-                outboundCount = viewModel.getOutboundCount(),
-                lastActivity  = viewModel.getLastActivity(),
+                inboundCount  = inboundCount,
+                outboundCount = outboundCount,
+                lastActivity  = lastActivity,
             )
 
             // ── Device name ──────────────────────────────────────────────

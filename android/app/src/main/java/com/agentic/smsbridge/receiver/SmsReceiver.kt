@@ -56,7 +56,7 @@ class SmsReceiver : BroadcastReceiver() {
                     deviceId = deviceId,
                 )
             )
-            repository.prefs.incrementInboundCount()
+            repository.incrementInbound()
 
         } catch (e: Exception) {
             Log.e(TAG, "Error processing SMS: ${e.message}")

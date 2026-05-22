@@ -39,6 +39,32 @@ class BridgeRepository @Inject constructor(
         _reconnectAttempt.value = attempt
     }
 
+    // ── Activity counters (reactive — UI observes these) ──────────────────
+    //
+    // Seeded from SharedPreferences on first access so the last-seen counts
+    // survive process death. Updated via incrementInbound/incrementOutbound
+    // so the Dashboard recomposes immediately on each new message.
+
+    private val _inboundCount  = MutableStateFlow(prefs.getInboundCount())
+    private val _outboundCount = MutableStateFlow(prefs.getOutboundCount())
+    private val _lastActivity  = MutableStateFlow(prefs.getLastActivity())
+
+    val inboundCount:  StateFlow<Int>  = _inboundCount.asStateFlow()
+    val outboundCount: StateFlow<Int>  = _outboundCount.asStateFlow()
+    val lastActivity:  StateFlow<Long> = _lastActivity.asStateFlow()
+
+    fun incrementInbound() {
+        prefs.incrementInboundCount()
+        _inboundCount.value = prefs.getInboundCount()
+        _lastActivity.value  = prefs.getLastActivity()
+    }
+
+    fun incrementOutbound() {
+        prefs.incrementOutboundCount()
+        _outboundCount.value = prefs.getOutboundCount()
+        _lastActivity.value  = prefs.getLastActivity()
+    }
+
     // ── Outbound channel (Android → Server) ───────────────────────────────
     //
     // SmsReceiver and BridgeService both write here.

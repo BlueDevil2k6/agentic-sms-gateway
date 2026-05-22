@@ -114,7 +114,7 @@ class SmsHandler @Inject constructor(
             )
         }
         if (status == "sent") {
-            repository.prefs.incrementOutboundCount()
+            repository.incrementOutbound()
         }
     }
 }

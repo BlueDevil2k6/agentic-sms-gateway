@@ -14,6 +14,9 @@ class DashboardViewModel @Inject constructor(
 
     val connectionState: StateFlow<ConnectionState> = repository.connectionState
     val reconnectAttempt: StateFlow<Int>            = repository.reconnectAttempt
+    val inboundCount:    StateFlow<Int>             = repository.inboundCount
+    val outboundCount:   StateFlow<Int>             = repository.outboundCount
+    val lastActivity:    StateFlow<Long>            = repository.lastActivity
 
     fun getServerUrl(): String =
         repository.prefs.getConfig()?.serverUrl
@@ -24,9 +27,6 @@ class DashboardViewModel @Inject constructor(
     fun getDeviceName(): String =
         repository.prefs.getConfig()?.deviceName ?: "—"
 
-    fun getInboundCount(): Int  = repository.prefs.getInboundCount()
-    fun getOutboundCount(): Int = repository.prefs.getOutboundCount()
-    fun getLastActivity(): Long = repository.prefs.getLastActivity()
 
     fun isBatteryOptimised(context: android.content.Context): Boolean {
         val pm = context.getSystemService(android.os.PowerManager::class.java)
