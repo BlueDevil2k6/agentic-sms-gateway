@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme. Compose handles theming; this is just needed for the manifest. -->
-    <style name="Theme.SmsBridge" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+        Base application theme. Compose handles all UI theming at runtime.
+        Splash screen attributes (API 31+) are safe here because minSdk = 34.
+    -->
+    <style name="Theme.SmsBridge" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Splash screen: deep indigo background matching the launcher icon -->
+        <item name="android:windowSplashScreenBackground">#1A237E</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#1A237E</item>
+        <!-- Transition to transparent once Compose content is ready -->
+        <item name="android:windowIsTranslucent">false</item>
+    </style>
 </resources>
