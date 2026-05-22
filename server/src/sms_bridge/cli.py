@@ -117,7 +117,7 @@ def _detect_ips() -> list[tuple[str, str]]:
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
-@click.version_option(version="0.1.2", prog_name="sms-bridge")
+@click.version_option(version="0.1.3", prog_name="sms-bridge")
 def cli() -> None:
     """SMS Bridge — Android SMS gateway for AI agents via MCP."""
 
@@ -358,12 +358,45 @@ def start() -> None:
     """Start the SMS Bridge gateway server."""
     cfg = _require_config()
 
+    from sms_bridge.fcm.client import _is_stub
+
     console.print()
+
+    # ── FCM warning banner ────────────────────────────────────────────────────
+    fcm_path = cfg.fcm_service_account_path
+    fcm_missing = (
+        not fcm_path
+        or not Path(fcm_path).exists()
+        or _is_stub(fcm_path)
+    )
+    if fcm_missing:
+        console.print(Panel(
+            "[bold yellow]⚠  FCM credentials not configured[/bold yellow]\n\n"
+            "The server will start, but [bold]FCM wake-up is disabled[/bold].\n\n"
+            "[bold]What this means:[/bold]\n"
+            "  • If the Android app's WebSocket drops (screen off, network change,\n"
+            "    Doze mode), outbound messages will queue but [bold]not be delivered\n"
+            "    until the device reconnects on its own[/bold].\n"
+            "  • Inbound SMS forwarding is unaffected — messages still flow while\n"
+            "    the WebSocket is open.\n\n"
+            "[bold]To fix:[/bold]\n"
+            "  1. Go to [link=https://console.firebase.google.com]console.firebase.google.com[/link] "
+            "→ Project Settings → Service accounts\n"
+            "  2. Click [bold]Generate new private key[/bold]\n"
+            f"  3. Overwrite  [cyan]{FCM_STUB_PATH}[/cyan]  with the downloaded JSON\n"
+            "  4. Restart the server with  [bold cyan]sms-bridge start[/bold cyan]",
+            border_style="yellow",
+            title="[yellow]FCM disabled[/yellow]",
+        ))
+        console.print()
+
+    # ── Startup panel ─────────────────────────────────────────────────────────
     console.print(Panel(
-        f"[bold green]SMS Bridge v0.1.0[/bold green]\n\n"
+        f"[bold green]SMS Bridge v0.1.2[/bold green]\n\n"
         f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
         f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
-        f"  Data  →  [dim]{cfg.data_dir}[/dim]\n\n"
+        f"  Data  →  [dim]{cfg.data_dir}[/dim]\n"
+        f"  FCM   →  {'[yellow]disabled (stub)[/yellow]' if fcm_missing else '[green]enabled[/green]'}\n\n"
         f"[dim]Press Ctrl+C to stop[/dim]",
         border_style="green",
     ))
