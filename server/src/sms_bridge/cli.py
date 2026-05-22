@@ -5,6 +5,7 @@ SMS Bridge CLI — install via pip, then:
   sms-bridge start    start the gateway server (background daemon)
   sms-bridge stop     stop the running daemon
   sms-bridge logs     tail the server log
+  sms-bridge send     send an outbound SMS
   sms-bridge qr       display Android device pairing QR code
   sms-bridge status   show current configuration and running state
   sms-bridge reset    remove saved configuration
@@ -190,7 +191,7 @@ def _generate_self_signed_cert(host: str, cert_path: Path, key_path: Path) -> No
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
-@click.version_option(version="0.1.5", prog_name="sms-bridge")
+@click.version_option(version="0.1.6", prog_name="sms-bridge")
 def cli() -> None:
     """SMS Bridge — Android SMS gateway for AI agents via MCP."""
 
@@ -537,7 +538,7 @@ def start(foreground: bool) -> None:
 
         tls_enabled = bool(cfg.tls_cert_path and Path(cfg.tls_cert_path).exists())
         console.print(Panel(
-            f"[bold green]SMS Bridge v0.1.5[/bold green]\n\n"
+            f"[bold green]SMS Bridge v0.1.6[/bold green]\n\n"
             f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
             f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
             f"  TLS   →  {'[green]enabled[/green]' if tls_enabled else '[dim]disabled (ws://)[/dim]'}\n"
@@ -584,7 +585,7 @@ def start(foreground: bool) -> None:
         )
 
     console.print(Panel(
-        f"[bold green]SMS Bridge v0.1.5 started[/bold green]  "
+        f"[bold green]SMS Bridge v0.1.6 started[/bold green]  "
         f"[dim](PID {proc.pid})[/dim]\n\n"
         f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
         f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
@@ -700,6 +701,87 @@ def qr(device_name: str, save: bool) -> None:
         img.save(dest)
         console.print(f"[green]✓ QR code saved to {dest}[/green]")
         console.print()
+
+
+# ── send ──────────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.argument("to")
+@click.argument("body")
+@click.option("--device-id", "-d", default="any", show_default=True,
+              help="Target device ID (omit to use any connected device).")
+def send(to: str, body: str, device_id: str) -> None:
+    """Send an outbound SMS through the gateway.
+
+    \b
+    TO    Destination phone number in E.164 format (e.g. +14155551234).
+    BODY  Message text (quote it if it contains spaces).
+
+    \b
+    Examples:
+      sms-bridge send +14155551234 "Hello from the CLI!"
+      sms-bridge send +14155551234 "Hi" --device-id abc-123
+    """
+    import urllib.request
+    import urllib.error
+
+    cfg = _require_config()
+    console.print()
+
+    # ── Try the live server first (immediate delivery) ─────────────────────
+    try:
+        url     = f"http://localhost:{cfg.mcp_port}/api/send"
+        payload = json.dumps({"to": to, "body": body, "device_id": device_id}).encode()
+        req     = urllib.request.Request(
+            url,
+            data    = payload,
+            headers = {
+                "Authorization": f"Bearer {cfg.api_key}",
+                "Content-Type":  "application/json",
+            },
+            method  = "POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = json.loads(resp.read())
+
+        connected = result.get("device_connected", False)
+        delivery  = (
+            "[green]dispatched — device is connected[/green]"
+            if connected else
+            "[yellow]queued — device offline, will send on reconnect[/yellow]"
+        )
+        console.print(Panel(
+            f"[bold green]✓  SMS sent[/bold green]\n\n"
+            f"  To      [cyan]{to}[/cyan]\n"
+            f"  Message {body}\n"
+            f"  ID      [dim]{result['message_id']}[/dim]\n"
+            f"  Status  {delivery}",
+            border_style="green",
+        ))
+
+    except urllib.error.URLError:
+        # ── Server not running — write directly to the file queue ──────────
+        console.print(
+            "[yellow]⚠  Server is not running — writing directly to queue.[/yellow]\n"
+            "   Start the server ([bold cyan]sms-bridge start[/bold cyan]) to deliver the message.\n"
+        )
+        from sms_bridge.queue.file_queue import FileQueue
+        queue = FileQueue(data_dir=cfg.data_dir)
+        msg   = queue.enqueue_outbound(to=to, body=body, device_id=device_id)
+        console.print(Panel(
+            f"[bold yellow]SMS queued (server offline)[/bold yellow]\n\n"
+            f"  To      [cyan]{to}[/cyan]\n"
+            f"  Message {body}\n"
+            f"  ID      [dim]{msg['id']}[/dim]\n"
+            f"  Status  [yellow]pending — will send when server starts[/yellow]",
+            border_style="yellow",
+        ))
+
+    except Exception as e:
+        console.print(f"[red]✗ Error:[/red] {e}")
+        sys.exit(1)
+
+    console.print()
 
 
 # ── gencert ───────────────────────────────────────────────────────────────────

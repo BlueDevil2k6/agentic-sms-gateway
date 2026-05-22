@@ -122,10 +122,46 @@ def build_mcp_app(router: MessageRouter, api_key: str, ws_url: str = "") -> Star
     async def handle_health(request):
         return JSONResponse({"status": "ok", "devices_connected": len(router._devices)})
 
+    async def handle_send(request):
+        """
+        REST endpoint for CLI / programmatic SMS sending.
+        Called by `sms-bridge send` — triggers immediate dispatch if a device
+        is connected, otherwise the message waits in outbound/pending/.
+
+        POST /api/send
+        Authorization: Bearer <api_key>
+        {"to": "+14155551234", "body": "Hello!", "device_id": "any"}
+        """
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {api_key}":
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        try:
+            body = await request.json()
+        except Exception:
+            return JSONResponse({"error": "Invalid JSON body"}, status_code=400)
+
+        to        = body.get("to", "").strip()
+        msg_body  = body.get("body", "").strip()
+        device_id = body.get("device_id", "any")
+
+        if not to or not msg_body:
+            return JSONResponse({"error": "'to' and 'body' are required"}, status_code=400)
+
+        try:
+            result = await router.send_sms(to=to, body=msg_body, device_id=device_id)
+            return JSONResponse({
+                **result,
+                "device_connected": bool(router._devices),
+            })
+        except Exception as e:
+            log.exception("handle_send error")
+            return JSONResponse({"error": str(e)}, status_code=500)
+
     return Starlette(routes=[
         Route("/mcp",          handle_sse,                       methods=["GET"]),
         Route("/mcp/messages", handle_messages,                  methods=["POST"]),
         Route("/health",       handle_health,                    methods=["GET"]),
+        Route("/api/send",     handle_send,                      methods=["POST"]),
         Route("/setup/qr",     make_qr_route(ws_url, api_key),   methods=["GET"]),
     ])
 
