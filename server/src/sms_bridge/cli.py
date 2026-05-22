@@ -50,6 +50,38 @@ def _mask(key: str) -> str:
     return key[:12] + "••••••••" if len(key) > 12 else "••••••••"
 
 
+def _detect_ips() -> list[tuple[str, str]]:
+    """
+    Return (interface_name, ipv4_address) for every non-loopback interface.
+    Includes Tailscale (100.x.x.x), VPN tunnels (tun*/utun*), Ethernet, Wi-Fi, etc.
+    Returns an empty list if psutil is not installed.
+    """
+    try:
+        import socket
+        import psutil
+        results = []
+        for iface, addrs in psutil.net_if_addrs().items():
+            for addr in addrs:
+                if (
+                    addr.family == socket.AF_INET
+                    and not addr.address.startswith("127.")
+                    and addr.address != "0.0.0.0"
+                ):
+                    # Annotate well-known interface patterns
+                    label = iface
+                    il = iface.lower()
+                    if "tailscale" in il or il.startswith("ts"):
+                        label = f"{iface} [dim](Tailscale)[/dim]"
+                    elif il.startswith("tun") or il.startswith("utun"):
+                        label = f"{iface} [dim](VPN)[/dim]"
+                    elif il.startswith("docker") or il.startswith("br-"):
+                        label = f"{iface} [dim](Docker)[/dim]"
+                    results.append((label, addr.address))
+        return results
+    except Exception:
+        return []
+
+
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
@@ -119,15 +151,49 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
         resolved_host = host or default_host or "localhost"
     else:
         console.print(
-            "Your server's [bold]public hostname or IP address[/bold].\n"
-            "[dim]This gets embedded in the Android device pairing QR code.\n"
-            "Use 'localhost' for local testing.[/dim]"
+            "Choose the [bold]IP address or hostname[/bold] the Android app will use to reach this server.\n"
+            "[dim]This is embedded in the pairing QR code.[/dim]\n"
         )
-        resolved_host = click.prompt(
-            "Hostname / IP",
-            default=default_host or "localhost",
-            prompt_suffix="\n  > ",
-        )
+
+        detected = _detect_ips()
+
+        if detected:
+            # Build a selection table
+            t = Table(box=box.SIMPLE, show_header=True, padding=(0, 2))
+            t.add_column("#",          style="bold", width=3)
+            t.add_column("Interface",  style="cyan")
+            t.add_column("IP Address", style="green")
+            for i, (iface, ip) in enumerate(detected, 1):
+                t.add_row(str(i), iface, ip)
+            t.add_row(
+                str(len(detected) + 1),
+                "[dim]custom[/dim]",
+                "[dim]Enter manually[/dim]",
+            )
+            console.print(t)
+
+            choice = click.prompt(
+                f"Select",
+                type=click.IntRange(1, len(detected) + 1),
+                default=1,
+            )
+            if choice <= len(detected):
+                resolved_host = detected[choice - 1][1]
+                console.print(f"  Using [green]{resolved_host}[/green]")
+            else:
+                resolved_host = click.prompt(
+                    "  Custom hostname or IP",
+                    default=default_host or "localhost",
+                    prompt_suffix="\n  > ",
+                )
+        else:
+            # psutil not available — fall back to plain prompt
+            console.print("[dim]Could not detect interfaces — enter manually.[/dim]")
+            resolved_host = click.prompt(
+                "Hostname / IP",
+                default=default_host or "localhost",
+                prompt_suffix="\n  > ",
+            )
     console.print()
 
     default_mcp = existing.get("mcp_port", 8080)

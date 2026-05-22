@@ -21,6 +21,7 @@ dependencies = [
     "qrcode[pil]>=7.4.0",         # QR code generation
     "click>=8.1.0",               # CLI framework
     "rich>=13.0.0",               # terminal formatting
+    "psutil>=5.9.0",              # network interface detection (setup wizard)
 ]
 
 [project.optional-dependencies]
