@@ -1,5 +1,7 @@
 package com.agentic.smsbridge.ui.dashboard
 
+import android.app.Activity
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -25,12 +27,20 @@ fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
 ) {
     val context          = LocalContext.current
+    val activity         = context as? Activity
     val connectionState  by viewModel.connectionState.collectAsStateWithLifecycle()
     val reconnectAttempt by viewModel.reconnectAttempt.collectAsStateWithLifecycle()
 
     // Start BridgeService when dashboard is shown
     LaunchedEffect(Unit) {
         BridgeService.start(context)
+    }
+
+    // Minimize to background on Back instead of finishing the Activity.
+    // This keeps the foreground service running and lets the user reopen
+    // the app from the launcher or notification without losing state.
+    BackHandler {
+        activity?.moveTaskToBack(true)
     }
 
     Scaffold(
