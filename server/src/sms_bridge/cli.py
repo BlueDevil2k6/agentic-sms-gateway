@@ -2,9 +2,11 @@
 SMS Bridge CLI — install via pip, then:
 
   sms-bridge setup    interactive configuration wizard
-  sms-bridge start    start the gateway server
+  sms-bridge start    start the gateway server (background daemon)
+  sms-bridge stop     stop the running daemon
+  sms-bridge logs     tail the server log
   sms-bridge qr       display Android device pairing QR code
-  sms-bridge status   show current configuration
+  sms-bridge status   show current configuration and running state
   sms-bridge reset    remove saved configuration
 """
 from __future__ import annotations
@@ -12,6 +14,9 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import os
+import signal
+import subprocess
 import sys
 from pathlib import Path
 
@@ -29,6 +34,8 @@ store   = ConfigStore()
 
 # Fixed paths — everything lives under ~/.sms-gateway
 FCM_STUB_PATH = SMS_GATEWAY_DIR / "fcm-service-account.json"
+PID_FILE      = SMS_GATEWAY_DIR / "sms-bridge.pid"
+LOG_FILE      = SMS_GATEWAY_DIR / "sms-bridge.log"
 
 FCM_STUB_CONTENT = {
     "_stub": True,
@@ -78,6 +85,17 @@ def _build_ws_url(host: str, ws_port: int, use_ssl: bool) -> str:
     return f"{scheme}://{host}:{ws_port}"
 
 
+def _get_running_pid() -> int | None:
+    """Return the PID from the PID file if the process is still alive, else None."""
+    try:
+        pid = int(PID_FILE.read_text().strip())
+        # Check if process exists (signal 0 = existence check)
+        os.kill(pid, 0)
+        return pid
+    except (FileNotFoundError, ValueError, ProcessLookupError, PermissionError):
+        return None
+
+
 def _mask(key: str) -> str:
     return key[:12] + "••••••••" if len(key) > 12 else "••••••••"
 
@@ -117,7 +135,7 @@ def _detect_ips() -> list[tuple[str, str]]:
 # ── CLI group ─────────────────────────────────────────────────────────────────
 
 @click.group()
-@click.version_option(version="0.1.3", prog_name="sms-bridge")
+@click.version_option(version="0.1.4", prog_name="sms-bridge")
 def cli() -> None:
     """SMS Bridge — Android SMS gateway for AI agents via MCP."""
 
@@ -354,59 +372,158 @@ def setup(non_interactive, api_key, host, mcp_port, ws_port, fcm_path, data_dir,
 # ── start ─────────────────────────────────────────────────────────────────────
 
 @cli.command()
-def start() -> None:
-    """Start the SMS Bridge gateway server."""
+@click.option(
+    "--foreground", "-f", is_flag=True,
+    help="Run in the foreground instead of daemonizing (useful for debugging).",
+)
+def start(foreground: bool) -> None:
+    """Start the SMS Bridge gateway server (background daemon by default)."""
     cfg = _require_config()
 
     from sms_bridge.fcm.client import _is_stub
 
-    console.print()
-
-    # ── FCM warning banner ────────────────────────────────────────────────────
     fcm_path = cfg.fcm_service_account_path
     fcm_missing = (
         not fcm_path
         or not Path(fcm_path).exists()
         or _is_stub(fcm_path)
     )
-    if fcm_missing:
+
+    # ── Foreground mode ───────────────────────────────────────────────────────
+    if foreground:
+        console.print()
+        if fcm_missing:
+            console.print(Panel(
+                "[bold yellow]⚠  FCM credentials not configured[/bold yellow]\n\n"
+                "The server will start, but [bold]FCM wake-up is disabled[/bold].\n\n"
+                "[bold]What this means:[/bold]\n"
+                "  • If the Android app's WebSocket drops (screen off, network change,\n"
+                "    Doze mode), outbound messages will queue but [bold]not be delivered\n"
+                "    until the device reconnects on its own[/bold].\n"
+                "  • Inbound SMS forwarding is unaffected — messages still flow while\n"
+                "    the WebSocket is open.\n\n"
+                "[bold]To fix:[/bold]\n"
+                "  1. Go to [link=https://console.firebase.google.com]console.firebase.google.com[/link] "
+                "→ Project Settings → Service accounts\n"
+                "  2. Click [bold]Generate new private key[/bold]\n"
+                f"  3. Overwrite  [cyan]{FCM_STUB_PATH}[/cyan]  with the downloaded JSON\n"
+                "  4. Restart the server with  [bold cyan]sms-bridge start[/bold cyan]",
+                border_style="yellow",
+                title="[yellow]FCM disabled[/yellow]",
+            ))
+            console.print()
+
         console.print(Panel(
-            "[bold yellow]⚠  FCM credentials not configured[/bold yellow]\n\n"
-            "The server will start, but [bold]FCM wake-up is disabled[/bold].\n\n"
-            "[bold]What this means:[/bold]\n"
-            "  • If the Android app's WebSocket drops (screen off, network change,\n"
-            "    Doze mode), outbound messages will queue but [bold]not be delivered\n"
-            "    until the device reconnects on its own[/bold].\n"
-            "  • Inbound SMS forwarding is unaffected — messages still flow while\n"
-            "    the WebSocket is open.\n\n"
-            "[bold]To fix:[/bold]\n"
-            "  1. Go to [link=https://console.firebase.google.com]console.firebase.google.com[/link] "
-            "→ Project Settings → Service accounts\n"
-            "  2. Click [bold]Generate new private key[/bold]\n"
-            f"  3. Overwrite  [cyan]{FCM_STUB_PATH}[/cyan]  with the downloaded JSON\n"
-            "  4. Restart the server with  [bold cyan]sms-bridge start[/bold cyan]",
-            border_style="yellow",
-            title="[yellow]FCM disabled[/yellow]",
+            f"[bold green]SMS Bridge v0.1.4[/bold green]\n\n"
+            f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
+            f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
+            f"  Data  →  [dim]{cfg.data_dir}[/dim]\n"
+            f"  FCM   →  {'[yellow]disabled (stub)[/yellow]' if fcm_missing else '[green]enabled[/green]'}\n\n"
+            f"[dim]Press Ctrl+C to stop[/dim]",
+            border_style="green",
         ))
         console.print()
 
-    # ── Startup panel ─────────────────────────────────────────────────────────
+        from sms_bridge.main import run
+        try:
+            asyncio.run(run(cfg))
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Server stopped.[/yellow]")
+        return
+
+    # ── Daemon mode (default) ─────────────────────────────────────────────────
+    existing_pid = _get_running_pid()
+    if existing_pid:
+        console.print(f"[yellow]SMS Bridge is already running (PID {existing_pid}).[/yellow]")
+        console.print("  Use [bold]sms-bridge stop[/bold] to stop it first.")
+        sys.exit(1)
+
+    # Ensure log directory exists
+    SMS_GATEWAY_DIR.mkdir(parents=True, exist_ok=True)
+
+    log_fh = open(LOG_FILE, "a")
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "sms_bridge", "start", "--foreground"],
+        stdout=log_fh,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,   # detach from terminal
+        close_fds=True,
+    )
+    PID_FILE.write_text(str(proc.pid))
+
+    console.print()
+    if fcm_missing:
+        console.print(
+            f"[yellow]⚠  FCM not configured[/yellow] — wake-up pushes disabled. "
+            f"See [dim]{FCM_STUB_PATH}[/dim] for instructions.\n"
+        )
+
     console.print(Panel(
-        f"[bold green]SMS Bridge v0.1.2[/bold green]\n\n"
+        f"[bold green]SMS Bridge v0.1.4 started[/bold green]  "
+        f"[dim](PID {proc.pid})[/dim]\n\n"
         f"  MCP   →  [cyan]http://0.0.0.0:{cfg.mcp_port}/mcp[/cyan]\n"
         f"  WS    →  [cyan]{cfg.ws_url}[/cyan]\n"
-        f"  Data  →  [dim]{cfg.data_dir}[/dim]\n"
-        f"  FCM   →  {'[yellow]disabled (stub)[/yellow]' if fcm_missing else '[green]enabled[/green]'}\n\n"
-        f"[dim]Press Ctrl+C to stop[/dim]",
+        f"  Logs  →  [dim]{LOG_FILE}[/dim]\n\n"
+        f"  [dim]sms-bridge stop[/dim]  to stop the server\n"
+        f"  [dim]sms-bridge logs[/dim]  to tail the log",
         border_style="green",
     ))
     console.print()
 
-    from sms_bridge.main import run
+
+# ── stop ──────────────────────────────────────────────────────────────────────
+
+@cli.command()
+def stop() -> None:
+    """Stop the running SMS Bridge daemon."""
+    pid = _get_running_pid()
+    if pid is None:
+        console.print("[yellow]SMS Bridge is not running.[/yellow]")
+        return
+
     try:
-        asyncio.run(run(cfg))
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Server stopped.[/yellow]")
+        os.kill(pid, signal.SIGTERM)
+        # Wait briefly and confirm
+        import time
+        for _ in range(20):
+            time.sleep(0.25)
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+        else:
+            # Still alive — escalate
+            os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass  # already gone
+
+    try:
+        PID_FILE.unlink()
+    except FileNotFoundError:
+        pass
+
+    console.print(f"[green]✓ SMS Bridge stopped (PID {pid}).[/green]")
+
+
+# ── logs ──────────────────────────────────────────────────────────────────────
+
+@cli.command()
+@click.option("--lines", "-n", default=50, show_default=True, help="Number of recent lines to show.")
+@click.option("--follow", "-f", is_flag=True, help="Follow log output (like tail -f).")
+def logs(lines: int, follow: bool) -> None:
+    """Show (or follow) the server log."""
+    if not LOG_FILE.exists():
+        console.print(f"[yellow]No log file found at {LOG_FILE}[/yellow]")
+        console.print("  Start the server with  [bold]sms-bridge start[/bold]  first.")
+        return
+
+    if follow:
+        try:
+            subprocess.run(["tail", f"-n{lines}", "-f", str(LOG_FILE)])
+        except KeyboardInterrupt:
+            pass
+    else:
+        subprocess.run(["tail", f"-n{lines}", str(LOG_FILE)])
 
 
 # ── qr ────────────────────────────────────────────────────────────────────────
@@ -478,6 +595,10 @@ def status() -> None:
     t.add_column(style="dim", min_width=24)
     t.add_column()
 
+    pid = _get_running_pid()
+    running_str = f"[green]running (PID {pid})[/green]" if pid else "[dim]stopped[/dim]"
+
+    t.add_row("Server",            running_str)
     t.add_row("Config file",       str(store.path))
     t.add_row("API key",           _mask(cfg.api_key))
     t.add_row("MCP port",          str(cfg.mcp_port))
@@ -486,6 +607,8 @@ def status() -> None:
     t.add_row("Data directory",    str(cfg.data_dir))
     t.add_row("Message retention", f"{cfg.message_retention_days} days")
     t.add_row("Log level",         cfg.log_level)
+    if pid:
+        t.add_row("Log file",      str(LOG_FILE))
 
     console.print(t)
     console.print()

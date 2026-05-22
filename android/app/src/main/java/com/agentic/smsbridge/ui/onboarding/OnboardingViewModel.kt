@@ -23,7 +23,6 @@ import javax.inject.Inject
 private const val TAG = "OnboardingVM"
 
 sealed class OnboardingStep {
-    object Welcome : OnboardingStep()
     object QrScanner : OnboardingStep()
     data class Connecting(val url: String) : OnboardingStep()
     data class ConnectionError(val message: String) : OnboardingStep()
@@ -37,16 +36,10 @@ class OnboardingViewModel @Inject constructor(
     private val okHttpClient: OkHttpClient,
 ) : ViewModel() {
 
-    private val _step = MutableStateFlow<OnboardingStep>(OnboardingStep.Welcome)
+    private val _step = MutableStateFlow<OnboardingStep>(OnboardingStep.QrScanner)
     val step: StateFlow<OnboardingStep> = _step.asStateFlow()
 
     private var parsedConfig: BridgeConfig? = null
-
-    // ── Welcome step ──────────────────────────────────────────────────────
-
-    fun onGetStarted() {
-        _step.value = OnboardingStep.QrScanner
-    }
 
     // ── QR scanning ───────────────────────────────────────────────────────
 
@@ -77,7 +70,7 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun retryFromQr() {
-        _step.value = OnboardingStep.Welcome
+        _step.value = OnboardingStep.QrScanner
     }
 
     fun retryConnection() {

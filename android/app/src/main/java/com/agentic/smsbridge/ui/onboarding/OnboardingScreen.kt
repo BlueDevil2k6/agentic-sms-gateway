@@ -66,7 +66,6 @@ fun OnboardingScreen(
     val step by viewModel.step.collectAsStateWithLifecycle()
 
     when (val s = step) {
-        is OnboardingStep.Welcome            -> WelcomeStep(viewModel)
         is OnboardingStep.QrScanner          -> QrScannerStep(viewModel)
         is OnboardingStep.Connecting         -> ConnectingStep(s.url)
         is OnboardingStep.ConnectionError    -> ConnectionErrorStep(s.message, viewModel)
@@ -77,70 +76,6 @@ fun OnboardingScreen(
                 onConfigured()
             }
         )
-    }
-}
-
-// ── Step: Welcome ─────────────────────────────────────────────────────────────
-
-@Composable
-private fun WelcomeStep(viewModel: OnboardingViewModel) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Spacer(Modifier.weight(1f))
-
-        AppLogo(size = 88.dp)
-
-        Spacer(Modifier.height(28.dp))
-
-        Text(
-            text = "SMS Bridge",
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "AI-powered SMS gateway",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(32.dp))
-
-        Text(
-            text = "Connect this phone to your AI agent framework. Once set up, your agents can send and receive SMS through this device — no carrier API required.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        Button(
-            onClick = { viewModel.onGetStarted() },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-        ) {
-            Text("Get Started", style = MaterialTheme.typography.titleMedium)
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        Text(
-            text = "You'll need your gateway server running and ready.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.outline,
-            textAlign = TextAlign.Center,
-        )
-
-        Spacer(Modifier.height(8.dp))
     }
 }
 
