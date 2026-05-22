@@ -28,7 +28,9 @@ class SmsReceiver : BroadcastReceiver() {
     lateinit var repository: BridgeRepository
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        Log.d(TAG, "onReceive: action=${intent.action}")
+        if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION &&
+            intent.action != Telephony.Sms.Intents.SMS_DELIVER_ACTION) return
 
         // goAsync() extends our processing window so we can do async work
         // without the system reclaiming the WakeLock before we finish.
@@ -49,14 +51,16 @@ class SmsReceiver : BroadcastReceiver() {
             Log.i(TAG, "SMS received from $from (${body.length} chars)")
 
             val deviceId = repository.prefs.getConfig()?.deviceId ?: "unknown"
-            repository.sendToServerBlocking(
-                OutboundMessage.SmsReceived(
-                    from     = from,
-                    body     = body,
-                    deviceId = deviceId,
-                )
+            val message = OutboundMessage.SmsReceived(
+                from     = from,
+                body     = body,
+                deviceId = deviceId,
             )
+
+            Log.d(TAG, "Forwarding to repository: $message")
+            repository.sendToServerBlocking(message)
             repository.incrementInbound()
+            Log.d(TAG, "Inbound count incremented")
 
         } catch (e: Exception) {
             Log.e(TAG, "Error processing SMS: ${e.message}")

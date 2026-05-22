@@ -80,6 +80,12 @@ class BridgeRepository @Inject constructor(
     // ── Convenience: send without suspend (from BroadcastReceiver) ────────
 
     fun sendToServerBlocking(message: OutboundMessage) {
-        _outboundChannel.trySend(message)
+        val result = _outboundChannel.trySend(message)
+        if (result.isFailure) {
+            android.util.Log.e(
+                "BridgeRepository",
+                "sendToServerBlocking: channel full or closed — message dropped: ${message::class.simpleName}"
+            )
+        }
     }
 }

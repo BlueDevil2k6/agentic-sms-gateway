@@ -63,7 +63,9 @@ class WebSocketClient @Inject constructor(
 
     fun send(message: OutboundMessage) {
         val json = message.toJson()
-        if (ws?.send(json) == false) {
+        if (ws?.send(json) == true) {
+            Log.i(TAG, "→ Sent to server: ${json.take(200)}")
+        } else {
             Log.w(TAG, "WebSocket send failed — message dropped: ${json.take(80)}")
         }
     }
@@ -154,6 +156,7 @@ class WebSocketClient @Inject constructor(
     private fun startOutboundPump() {
         outboundJob = scope.launch {
             for (message in repository.outboundChannel) {
+                Log.i(TAG, "Outbound dequeued: ${message::class.simpleName}")
                 if (repository.connectionState.value == ConnectionState.CONNECTED) {
                     send(message)
                 } else {
