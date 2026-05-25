@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.agentic.smsbridge.model.ConnectionState
 import com.agentic.smsbridge.service.BridgeService
@@ -33,6 +35,15 @@ fun DashboardScreen(
     val inboundCount     by viewModel.inboundCount.collectAsStateWithLifecycle()
     val outboundCount    by viewModel.outboundCount.collectAsStateWithLifecycle()
     val lastActivity     by viewModel.lastActivity.collectAsStateWithLifecycle()
+
+    var hasSmsPermissions by remember { mutableStateOf(viewModel.hasSmsPermissions(context)) }
+    var isBatteryOptimised by remember { mutableStateOf(viewModel.isBatteryOptimised(context)) }
+
+    // Re-check permissions status when the app comes back to foreground
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        hasSmsPermissions = viewModel.hasSmsPermissions(context)
+        isBatteryOptimised = viewModel.isBatteryOptimised(context)
+    }
 
     // Start BridgeService when dashboard is shown
     LaunchedEffect(Unit) {
@@ -76,7 +87,7 @@ fun DashboardScreen(
             StatusCard {
                 StatusRow(
                     label  = "SMS permissions",
-                    ok     = viewModel.hasSmsPermissions(context),
+                    ok     = hasSmsPermissions,
                     okText = "Granted",
                     errText = "Denied",
                 )
@@ -88,7 +99,7 @@ fun DashboardScreen(
                 )
                 StatusRow(
                     label   = "Battery exempt",
-                    ok      = !viewModel.isBatteryOptimised(context),
+                    ok      = !isBatteryOptimised,
                     okText  = "Unrestricted",
                     errText = "Restricted — may delay messages",
                     isWarning = true,
